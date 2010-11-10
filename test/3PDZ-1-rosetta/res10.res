@@ -1,0 +1,10 @@
+1 PRO    1
+2 LYS    2
+3 PRO    3
+4 GLY    4
+5 ASP    5
+6 ILE    6
+7 PHE    7
+8 GLU    8
+9 VAL    9
+10 GLU   10

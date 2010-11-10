@@ -1,0 +1,39 @@
+library(marray)
+
+S1M47_mutent<- read.table("C:/Jacobson/homeira/remove_insig_dof/1M47_phipsichi.reslist-nsims5-structs10001-bin30_bootstrap_sigavg_mutinf_res_0diag.txt")
+
+
+pdf(file="C:/Jacobson/homeira/bootstraps/MI_nocluster_1M47_newboot_phipsichi_alpha01.pdf")
+heatmap(x=as.matrix((S1M47_mutent)), col = maPalette(low = "white", high = "black", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", main="Mutual Information For Apo IL-2",  Rowv = NA, Colv = NA, cexRow=0.2,  cexCol=0.2,    oldstyle = FALSE,symm=TRUE )
+dev.off()
+#windows()
+pdf(file="C:/Jacobson/homeira/bootstraps/MI_cluster_1M47_newbootstrap9_phipsichi_sigavg_05.pdf")
+heatmap(x=as.matrix((max(S1M47_mutent)-S1M47_mutent)), col = maPalette(low = "black", high = "white", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", main="Mutual Information for Apo IL-2", reorderfun = function(d,w) rev(reorder(d,w)),revC=TRUE, cexRow=0.2,  cexCol=0.2,      oldstyle = FALSE,symm=TRUE )
+dev.off()
+#windows()
+pdf(file="C:/Jacobson/homeira/bootstraps/MI_colorbar_1M47_newbootstrap9_phipsichi_sigavg_05.pdf")
+maColorBar(seq(min(S1M47_mutent),max(S1M47_mutent),by=(max(S1M47_mutent)-min(S1M47_mutent))/50), col = maPalette(low = "white", high = "black", k =50))
+dev.off()
+
+
+#for plot similar to oGNM plot
+image(as.matrix(rev(S1M47_mutent)),col = maPalette(low = "white", high = "black", k =50), add = FALSE, xaxt= "n", yaxt = "n", main="Mutual Information For Apo IL-2")
+
+pdf(file="C:/Jacobson/homeira/bootstraps/MI_nocluster_1M47_9h_nostats_agg_compare_to_GNM_phipsichi.pdf")
+image(as.matrix(rev(S1M47_mutent)),col = maPalette(low = "white", high = "black", k =50), add = FALSE, xaxt= "n", yaxt = "n",xlab="Residue i",ylab="Residue j")
+axis(2,labels=c(0,20,40,60,80,100,120,132),at=c(1-0,1-20/132,1-40/132,1-60/132,1-80/132,1-100/132,1-120/132,1-132/132))
+axis(1,labels=c(0,20,40,60,80,100,120,132),at=c(0,20/132,40/132,60/132,80/132,100/132,120/132,132/132))
+rect(72/132,1-46/132,86/132,1-29/132,border="red")
+rect(29/132,1-46/132,46/132,1-29/132,border="red")
+rect(72/132,1-86/132,86/132,1-72/132,border="red")
+rect(72/132,1-6/132,86/132,1-4/132,border="blue")
+
+rect(99/132,1-86/132,101/132,1-4/132,border="blue")
+rect(119/132,1-86/132,121/132,1-4/132,border="blue")
+
+rect(127/132,1-86/132,132.5/132,1-4/132,border="blue")
+rect(72/132,1-10/132,86/132,1-16/132,border="blue")
+
+#segments(0,1.05,1.05,1.05)
+#segments(1.05,0,1.05,1.05)
+dev.off()

@@ -1,0 +1,9 @@
+Chi angles for PHE78 from a 10ns sim from Homeira Amirkhani and David Mobley, 
+of apo human IL-2 (PDB 1M47) for code validation
+
+Hand calculation for PHE78:
+For 15 degree bins, tot entropy = 4.219228
+For 18 degree bins, tot entropy = 3.897372
+For 20 degree bins, tot entropy = 3.713323
+
+For the Excel Files, goto worksheet "TotEnt" for these values

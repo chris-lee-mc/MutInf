@@ -1,0 +1,315 @@
+
+#### For Fig. 3 ################
+
+S1M47_mutent <- S1M47_mutent_fulldiag
+
+cc_mat <- matrix(NA, 133, 133)
+
+for(i in 1:133) 
+{
+ for(j in i:133)
+ {
+  for(n in 1:8911)
+  {
+  if(cc_upper_triangular$V1[n] == i && cc_upper_triangular$V2[n] == j) { cc_mat[i,j] = cc_upper_triangular$V3[n] }
+  if(cc_upper_triangular$V1[n] == j && cc_upper_triangular$V2[n] == i) { cc_mat[j,i] = cc_upper_triangular$V3[n] }
+  }
+ }
+}
+
+cc_mat_backup <- cc_mat
+
+for(i in 1:133) for(j in i:133) cc_mat[j, i] = cc_mat[i,j]
+
+cc_mat_132 <- matrix(NA, 132, 132)
+
+for(i in 1:132) for(j in 1:132) cc_mat_132[i, j] = cc_mat[i,j]
+
+S1M47_mutent <- data.frame(abs(cc_mat_132))
+
+####################################
+
+
+#image(as.matrix(rev(S1M47_mutent)),col = maPalette(low = "lightblue", mid="yellow", high = "red", k =50), add = FALSE, xaxt= "n", yaxt = "n",xlab="Residue i",ylab="Residue j")
+image(as.matrix(rev(S1M47_mutent)),col = maPalette(low = "lightblue", high = "red", k =50), add = FALSE, xaxt= "n", yaxt = "n",xlab="Residue i",ylab="Residue j")
+
+
+image(as.matrix(rev(S1M47_mutent)),col = topo.colors(50), add = FALSE, xaxt= "n", yaxt = "n",xlab="Residue i",ylab="Residue j")
+
+axis(2,labels=c(0,20,40,60,80,100,120,132),at=c(1-0,1-20/132,1-40/132,1-60/132,1-80/132,1-100/132,1-120/132,1-132/132))
+axis(1,labels=c(0,20,40,60,80,100,120,132),at=c(0,20/132,40/132,60/132,80/132,100/132,120/132,132/132))
+rect(72/132,1-46/132,86/132,1-29/132,border="yellow")
+rect(29/132,1-46/132,46/132,1-29/132,border="yellow")
+rect(72/132,1-86/132,86/132,1-72/132,border="yellow")
+
+
+
+for(j in 1:125) S1M47_mutent[j,j] <- 0
+
+for(i in 1:136) for(j in i:136) S1M47_mutent[j,i] = S1M47_mutent[i,j]
+
+### Figures 2 and 3 ##########
+
+#for plot similar to oGNM plot
+image(as.matrix(rev(S1M47_mutent)),col = maPalette(low = "white", high = "black", k =50), add = FALSE, xaxt= "n", yaxt = "n", main="Mutual Information For Apo IL-2")
+
+#pdf(file="C:/Jacobson/homeira/bootstraps/MI_nocluster_1M47_9i_agg_compare_to_GNM_phipsichi.pdf")
+image(as.matrix(rev(S1M47_mutent)),col = maPalette(low = "white", high = "black", k =50), add = FALSE, xaxt= "n", yaxt = "n",xlab="Residue i",ylab="Residue j")
+axis(2,labels=c(0,20,40,60,80,100,120,132),at=c(1-0,1-20/132,1-40/132,1-60/132,1-80/132,1-100/132,1-120/132,1-132/132))
+axis(1,labels=c(0,20,40,60,80,100,120,132),at=c(0,20/132,40/132,60/132,80/132,100/132,120/132,132/132))
+rect(72/132,1-46/132,86/132,1-29/132,border="red")
+rect(29/132,1-46/132,46/132,1-29/132,border="red")
+rect(72/132,1-86/132,86/132,1-72/132,border="red")
+rect(72/132,1-6/132,86/132,1-4/132,border="blue")
+
+rect(99/132,1-86/132,101/132,1-4/132,border="blue")
+rect(119/132,1-86/132,121/132,1-4/132,border="blue")
+
+rect(127/132,1-86/132,132.5/132,1-4/132,border="blue")
+rect(72/132,1-10/132,86/132,1-16/132,border="blue")
+
+#segments(0,1.05,1.05,1.05)
+#segments(1.05,0,1.05,1.05)
+dev.off()
+
+par(oma=c(0,0,0,1))
+maColorBar(seq(min(S1M47_mutent),max(S1M47_mutent),by=(max(S1M47_mutent)-min(S1M47_mutent))/50), horizontal=FALSE, col = maPalette(low = "white", high = "black", k =50))
+
+
+S1M47_mutent<- read.table("C:/Jacobson/homeira/bootstraps/1M47_phipsichi_newbootstrap9i_nostats2_agg.reslist-nsims5-structs10001-bin15_bootstrap_avg_mutinf_res_0diag_fixnames.txt")
+
+
+
+S1M47_mutent<- read.table("C:/Jacobson/homeira/remove_insig_dof/1M47_chi_w15_bootstrap_smaller.reslist-nsims5-structs1001-bin30_bootstrap_sigavg__mutinf_0diag_fixnames.txt")
+
+### Figure 4 ####
+library(gregmisc)
+
+CA_dist_matrix_1M47_0.25kT <- read.table("C:/Jacobson/homeira/bootstraps/1M47_phipsichi_9i_dist_analysis.reslist_quarter_kT_CA_dist_matrix_fixnames.txt")
+mutinfs_1M47_0.25kT <- read.table("C:/Jacobson/homeira/bootstraps/1M47_phipsichi_9i_dist_analysis.reslist_quarter_kT_mutinfs_fixnames.txt")
+
+vec_CA_dist_matrix_1M47_0.25kT <- as.vector(as.matrix(CA_dist_matrix_1M47_0.25kT))
+vec_mutinfs_1M47_0.25kT <- as.vector(as.matrix(mutinfs_1M47_0.25kT))
+
+for(i in c(1:length(vec_mutinfs_1M47_0.25kT)))
+{
+if(vec_mutinfs_1M47_0.25kT[i] == 0) {vec_mutinfs_1M47_0.25kT[i] = NA;}
+}
+
+vec_CA_0.25kT_hist <- hist2d(vec_CA_dist_matrix_1M47_0.25kT,vec_mutinfs_1M47_0.25kT,nbins=20,col = maPalette(low = "white", high = "black", k =255),xlab="C-alpha Separation in Angstroms", ylab="Mutual Information in kT")
+axis(2,labels=c(0.25),at=c(0)
+
+
+par(oma=c(0,0,0,1))
+maColorBar(seq(min(vec_CA_0.25kT_hist$counts),max(vec_CA_0.25kT_hist$counts),by=(max(vec_CA_0.25kT_hist$counts)-min(vec_CA_0.25kT_hist$counts))*1.0/50), horizontal=FALSE, col = maPalette(low = "white", high = "black", k =50),main="Counts")
+
+###################
+
+####### Figure 5 ######
+
+S1M47_mutent<-read.table("C:/Jacobson/homeira/bootstraps/1M47_phipsichi_9i_dist_analysis.reslist_full_kT_CA_dist_over5_matrix_fixnames.txt")
+
+require(cluster)
+blah <- agnes(as.matrix(max(S1M47_mutent)-S1M47_mutent))
+
+blah2<-as.hclust(blah)
+heatmap(x=as.matrix((S1M47_mutent)), col = maPalette(low = "white", high = "black", k =50), zlim=c(min(S1M47_mutent),max(S1M47_mutent)),    add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", xlab="residue", ylab="residue", main="1M47",revC=TRUE, Rowv = as.dendrogram(blah2), Colv = as.dendrogram(blah2), reorderfun = function(d,w) rev(reorder(d,w)),  oldstyle = FALSE,cexRow=0.2,cexCol=0.20,symm=TRUE )
+
+
+
+#heatmap(x=as.matrix((S1M47_mutent)), col = maPalette(low = "white", high = "black", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", main="Mutual Information for Apo IL-2", reorderfun = function(d,w) rev(reorder(d,w)),revC=TRUE, cexRow=0.2,  cexCol=0.2,      oldstyle = FALSE,symm=TRUE )
+
+
+par(oma=c(0,0,0,1))
+maColorBar(seq(min(S1M47_mutent),max(S1M47_mutent),by=(max(S1M47_mutent)-min(S1M47_mutent))/50), horizontal=TRUE, col = maPalette(low = "white", high = "black", k =50))
+
+
+
+###### Figure 6  #####
+
+
+S1M47_mutent<- read.table("C:/Jacobson/homeira/bootstraps/1M47_phipsichi_newbootstrap9i_agg.reslist-nsims5-structs10001-bin15_bootstrap_avg_mutinf_res_0diag_fixnames.txt")
+
+heatmap(x=as.matrix((max(S1M47_mutent)-S1M47_mutent)), col = maPalette(low = "black", high = "white", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", reorderfun = function(d,w) rev(reorder(d,w)),revC=TRUE, cexRow=0.2,  cexCol=0.2,      oldstyle = FALSE,symm=TRUE )
+
+
+#heatmap(x=as.matrix((max(S1M47_mutent)-S1M47_mutent)), col = maPalette(low = "black", high = "white", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", main="Mutual Information for Apo IL-2", reorderfun = function(d,w) rev(reorder(d,w)),revC=TRUE, cexRow=0.2,  cexCol=0.2,      oldstyle = FALSE,symm=TRUE )
+
+
+#######################
+
+
+
+###### Figure 7 #############################
+
+
+
+##Now with 3-Letter Codes 
+
+
+myblehplus3<-array(NA,dim=c(27,27))
+count1<-0
+for(i in c(23,24,27,29,31,32,35,39,70,73,74,78,80,81,82,85,34,38,41,42,43,44,45,62,65,72,111))
+{ 
+ count1<-count1+1;
+ count2<-0;
+ 
+ for(j in c(23,24,27,29,31,32,35,39,70,73,74,78,80,81,82,85,34,38,41,42,43,44,45,62,65,72,111))
+	{
+ 
+ count2<-count2+1;
+           if(S1M47_mutent[i,j]>=0)  {myblehplus3[count1,count2]<-S1M47_mutent[i,j]}
+             
+           if(S1M47_mutent[i,j]<0) { myblehplus3[count1,count2]<-0;}
+         }
+}
+
+
+
+data3<- data.frame(myblehplus3,row.names=c("MET23","ILE24","GLY27","ASN29","TYR31","LYS32","LYS35","MET39","LEU70","ALA73","GLN74","PHE78","LEU80","ARG81","PRO82","LEU85","PRO34","ARG38","THR41","PHE42","LYS43","PHE44","TYR45","GLU62","PRO65","LEU72","THR111"))
+
+names(data3)<-c("MET23","ILE24","GLY27","ASN29","TYR31","LYS32","LYS35","MET39","LEU70","ALA73","GLN74","PHE78","LEU80","ARG81","PRO82","LEU85","PRO34","ARG38","THR41","PHE42","LYS43","PHE44","TYR45","GLU62","PRO65","LEU72","THR111")
+
+heatmap(x=as.matrix((data3)), col = maPalette(low = "white", high = "black", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", xlab="residue", ylab="residue",  Rowv = NA, Colv = NA,      oldstyle = FALSE,symm=TRUE )
+
+maColorBar(seq(min(data3),max(data3),by=(max(data3)-min(data3))/50), col = maPalette(low = "white", high = "black", k =50), horizontal=TRUE)
+
+
+
+### With Met39 in the top site instead
+
+
+
+myblehplus3<-array(NA,dim=c(27,27))
+count1<-0
+for(i in c(23,24,27,29,31,32,35,70,73,74,78,80,81,82,85,34,38,39,41,42,43,44,45,62,65,72,111))
+{ 
+ count1<-count1+1;
+ count2<-0;
+ 
+ for(j in c(23,24,27,29,31,32,35,70,73,74,78,80,81,82,85,34,38,39,41,42,43,44,45,62,65,72,111))
+	{
+ 
+ count2<-count2+1;
+           if(S1M47_mutent[i,j]>=0)  {myblehplus3[count1,count2]<-S1M47_mutent[i,j]}
+             
+           if(S1M47_mutent[i,j]<0) { myblehplus3[count1,count2]<-0;}
+         }
+}
+
+
+
+data3<- data.frame(myblehplus3,row.names=c("MET23","ILE24","GLY27","ASN29","TYR31","LYS32","LYS35","LEU70","ALA73","GLN74","PHE78","LEU80","ARG81","PRO82","LEU85","PRO34","ARG38","THR41","MET39","PHE42","LYS43","PHE44","TYR45","GLU62","PRO65","LEU72","THR111"))
+
+names(data3)<-c("MET23","ILE24","GLY27","ASN29","TYR31","LYS32","LYS35","LEU70","ALA73","GLN74","PHE78","LEU80","ARG81","PRO82","LEU85","PRO34","ARG38","MET39","THR41","PHE42","LYS43","PHE44","TYR45","GLU62","PRO65","LEU72","THR111")
+
+heatmap(x=as.matrix((data3)), col = maPalette(low = "white", high = "black", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", xlab="residue", ylab="residue",  Rowv = NA, Colv = NA,      oldstyle = FALSE,symm=TRUE )
+
+maColorBar(seq(min(data3),max(data3),by=(max(data3)-min(data3))/50), col = maPalette(low = "white", high = "black", k =50), horizontal=TRUE)
+
+
+
+
+### Now for graphing nodes and edges ...
+
+
+
+
+myblehplus3<-array(NA,dim=c(23,23))
+count1<-0
+for(i in c(23,24,29,31,32,35,39,70,73,74,78,80,81,82,85,34,38,41,42,43,44,45,111))
+{ 
+ count1<-count1+1;
+ count2<-0;
+ 
+ for(j in c(23,24,29,31,32,35,39,70,73,74,78,80,81,82,85,34,38,41,42,43,44,45,111))
+	{
+ 
+ count2<-count2+1;
+           if(S1M47_mutent[i,j]>=0)  {myblehplus3[count1,count2]<-S1M47_mutent[i,j]}
+             
+           if(S1M47_mutent[i,j]<0) { myblehplus3[count1,count2]<-0;}
+         }
+}
+
+
+
+data3<- data.frame(myblehplus3,row.names=c("M23","I24","N29","Y31","K32","K35","M39","L70","A73","Q74","F78","L80","R81","P82","L85","P34","R38","T41","F42","K43","F44","Y45","T111"))
+
+names(data3)<-c("M23","I24","N29","Y31","K32","K35","M39","L70","A73","Q74","F78","L80","R81","P82","L85","P34","R38","T41","F42","K43","F44","Y45","T111")
+
+heatmap(x=as.matrix((data3)), col = maPalette(low = "white", high = "black", k =50),     add = FALSE, xaxs = "i", yaxs = "i",xaxt= "n", yaxt = "n", xlab="residue", ylab="residue",  Rowv = NA, Colv = NA,      oldstyle = FALSE,symm=TRUE )
+
+maColorBar(seq(min(data3),max(data3),by=(max(data3)-min(data3))/50), col = maPalette(low = "white", high = "black", k =50))
+
+
+
+
+
+# read MI data from residue matrix
+
+require(igraph)
+m <- data3
+
+# set values lower than 0.015 to 0 to reduce clutter
+m[m<0.05] = 0
+
+# make the graph using the MI values as thei weights
+g <- graph.adjacency(as.matrix(m), weighted=TRUE, mode="max")
+
+# define a list of strings containing the edge weights & list of line widths
+# separate MI strengths into groups with line widths 1, 3 or 5
+edge_weights <- E(g)$weight
+edge_weights_str <- format(edge_weights, scientific = TRUE ,digits=2)
+edge_widths <- rep(0.2,length(edge_weights))
+#edge_widths[edge_weights>.05] = 0.5
+#edge_widths[edge_weights>.1]  = 1
+
+# define the layout of the plot; use the weights parameter to square the effective
+# edge weights used to make the plot; makes vertices less likely to be on top of each other
+layout=layout.fruchterman.reingold(g, weights=edge_weights)
+
+V(g)$size=10 
+V(g)$color="white"
+V(g)$label.color="black" 
+V(g)$label=attr(m,"names")
+V(g)$label.cex=.5
+
+V(g)$name = attr(m,"names")
+V(g)[18]$color="red"
+V(g)[5]$color="blue"
+V(g)[9]$color="forestgreen"
+V(g)[12]$color="steelblue"
+V(g)[16]$color="cyan"
+ 
+
+
+plot.igraph(g, layout=layout,
+	 vertex.size=17, vertex.label.color="black", 
+	 vertex.label=attr(m,"names"), vertex.label.cex=0.8, 
+	  edge.color="black")	
+
+
+
+V(g)$size=10 
+V(g)$color="white"
+V(g)$label.color="black" 
+V(g)$label=attr(m,"names")
+V(g)$label.cex=.5
+
+V(g)$name = attr(m,"names")
+V(g)[3]$color="magenta"
+V(g)[6]$color="yellow"
+V(g)[11]$color="orange"
+V(g)[10]$color="brown"
+V(g)[18]$color="red"
+V(g)[14]$color="wheat"
+
+plot.igraph(g, layout=layout,
+	 vertex.size=17, vertex.label.color="black", 
+	 vertex.label=attr(m,"names"), vertex.label.cex=0.8, 
+	  edge.color="black")	
+
+
+########################################################################
+

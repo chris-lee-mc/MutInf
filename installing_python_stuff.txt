@@ -1,0 +1,173 @@
+Building GCC-compiled Python with packages Numpy/Scipy optimized with the Intel C-compiler and MKL 10
+Chris McClendon
+
+
+These were built on broadway. 
+
+
+
+Tripped out Python install
+
+Basically, it looks like only with recent changes to the repository will this go without a hitch on our machines for both numpy and scipy.
+
+First:
+
+Get the right versions of numpy and scipy. This protocol didn't work without the newest versions from svn:
+
+svn co http://svn.scipy.org/svn/numpy/trunk numpy
+svn co http://svn.scipy.org/svn/scipy/trunk scipy
+
+I tarred these up in my home directory to save a snapshot of them.
+
+/home/mcclendon/scipy_0.7.x.svn.tar.gz
+/home/mcclendon/numpy_1.3.x.patched.svn.tar.gz
+
+you should make separate directories of these for 32-bit and 64-bit installs. 
+
+
+Export(in bash) the following environment variable for 32-bit MKL: (as per http://www.scipy.org/Download# )
+
+    LD_RUN_PATH=/software/intel/cc/10.1.011/lib:/software/intel/cce/10.1.011/lib:/software/intel/fc/10.1.011/lib:/software/intel/mkl/10.0.1.014/lib/32
+
+note: these should *not* be in your LD_LIBRARY_PATH right now.
+
+1. Use GCC to configure and build Python 2.6.2. You need to make separate Python 2.6.2 directories for 32-bit and 64-bit versions.
+
+Don't set up intel licenses yet. I used the system's default GCC 4.1.2, but I recommend using a newer version. I couldn't get the one in /software/gcc/ to configure Python, it failed to write a proper a.out from the configtest C file or something like that.
+
+Here's a full list of enviroment variables:
+
+########################################################################################################################
+SCHRODINGER_RCP=scp
+SCHRODINGER_SITEPACK=/software/schrodinger/Jun2008/mmshare-v16109/lib/Linux-x86/lib/python2.4/site-packages/schrodinger
+HOSTNAME=broadway.jacobsonlab.org
+MPICH_HOME=/home/swon9/usr/mpich-1.2.5.2_new
+PSP_BLAST_DIR=/software/schrodinger/thirdparty/bin/Linux-x86/blast/
+TERM=xterm
+SHELL=/bin/bash
+SCHRODINGER_UTILITIES=/software/schrodinger/Sep2008/utilities
+HISTSIZE=1000
+SCHRODINGER_THIRDPARTY=/software/schrodinger/thirdparty
+SSH_CLIENT=169.230.22.187 42044 22
+CVSROOT=mcclendon@broadway:/cvs/plop/
+SCHRODINGER=/software/schrodinger/Sep2008
+PSP_BLASTDB=/software/schrodinger/thirdparty/database/blast/
+OLDPWD=/home/mcclendon
+SSH_TTY=/dev/pts/3
+USER=mcclendon
+LD_LIBRARY_PATH=/home/swon9/usr/mpich-1.2.5.2_new/lib:/software/schrodinger/thirdparty/desmond_to_trj/::/software/schrodinger/thirdparty/desmond_to_trj
+LS_COLORS=no=00:fi=00:di=00;34:ln=00;36:pi=40;33:so=00;35:bd=40;33;01:cd=40;33;01:or=01;05;37;41:mi=01;05;37;41:ex=00;32:*.cmd=00;32:*.exe=00;32:*.com=00;32:*.btm=00;32:*.bat=00;32:*.sh=00;32:*.csh=00;32:*.tar=00;31:*.tgz=00;31:*.arj=00;31:*.taz=00;31:*.lzh=00;31:*.zip=00;31:*.z=00;31:*.Z=00;31:*.gz=00;31:*.bz2=00;31:*.bz=00;31:*.tz=00;31:*.rpm=00;31:*.cpio=00;31:*.jpg=00;35:*.gif=00;35:*.bmp=00;35:*.xbm=00;35:*.xpm=00;35:*.png=00;35:*.tif=00;35:
+SCHRODINGER_PRIMEMMGBSA_SCRIPT=psp-v16207/bin/Linux-x86/prime_mmgbsa.py
+MAIL=/var/spool/mail/mcclendon
+PATH=/software/schrodinger/Sep2008:/software/schrodinger/Nov2007:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/mcclendon/plop_15dec_fork/plop/:/home/ck/pbs:/home/mcclendon/scripts/:/software/schrodinger/Sep2008/:/software/schrodinger/Sep2008/utilities:/home/mcclendon/chimera/bin:/software/gromacs/gromacs-3.3.2/bin/:/software/schrodinger/thirdparty/desmond_to_trj:/home/laura/grom321/grom3/i686-pc-linux-gnu/bin:/home/mcclendon/amber9/exe:/home/swon9/usr/mpich-1.2.5.2_new/bin:/software/schrodinger/thirdparty/desmond_to_trj:/home/mcclendon/bin
+LD_RUN_PATH=/software/intel/cc/10.1.011/lib:/software/intel/cce/10.1.011/lib:/software/intel/fc/10.1.011/lib:/software/intel/mkl/10.0.1.014/lib/32
+INPUTRC=/etc/inputrc
+PWD=/home/mcclendon/Python-2.6.2
+LANG=en_US.UTF-8
+SCHRODINGER_PDB=/software/schrodinger/thirdparty/database/pdb
+P4_GLOBMEMSIZE=10000000
+SCHRODINGER_RSH=ssh
+LM_LICENSE_FILE=27000@broadway
+SHLVL=1
+HOME=/home/mcclendon
+LOGNAME=mcclendon
+CVS_RSH=ssh
+SSH_CONNECTION=169.230.22.187 42044 169.230.26.28 22
+MPI_HOME=/home/swon9/usr/mpich-1.2.5.2_new
+LESSOPEN=|/usr/bin/lesspipe.sh %s
+PSP_BLAST_DATA=/software/schrodinger/thirdparty/bin/Linux-x86/blast/data/
+DISPLAY=localhost:12.0
+INCLUDE=/home/swon9/usr/mpich-1.2.5.2_new/include:
+AMBERHOME=/home/mcclendon/amber9
+G_BROKEN_FILENAMES=1
+_=/bin/env
+
+###########################################################################################
+
+Here are the commands I needed to run:
+
+32-bit on broadway:
+
+     cd Python-2.6.2
+     ./configure --prefix=/home/mcclendon/opt32
+     make 
+     make install
+
+64-bit on timesquare:
+
+export CFLAGS='-m64 -fPIC'
+export CC=gcc
+./configure --with-universal-archs=64-bit --prefix=/home/mcclendon/opt64
+
+
+2. Make a site.cfg file (for 32-bit or 64-bit) and **copy it to the numpy/ and scipy/ install directories**. Each of these contain a site.cfg.example to show you what's needed.
+
+------------site.cfg-----------------
+# MKL
+#----
+# For recent (9.0.21, for example) mkl, you need to change the names of the
+# lapack library. Assuming you installed the mkl in /opt, for a 32 bits cpu:
+#[mkl]
+#library_dirs = /software/intel/mkl/9.1.023/lib/64/
+# lapack_libs = mkl_lapack
+#
+# For 10.*, on 32 bits machines:
+[mkl]
+library_dirs = /software/intel/mkl/10.0.1.014/lib/32/
+lapack_libs = mkl_lapack
+mkl_libs = mkl, guide
+#
+# For 10.*, on 64 bits machines:
+#[mkl]
+#library_dirs = /software/intel/mkl/10.0.1.014/lib/em64t/
+#lapack_libs = mkl_lapack
+#mkl_libs = mkl, guide
+#
+-------------EOF--------------------------------------------
+
+
+3.Set up the Intel C-compiler licenses and environment variables
+      
+       source /software/intel/intel32.sh
+
+
+4. Build Numpy
+Go into the numpy directory
+Use your new build of Python 2.6.2 and the intel C-compiler with MKL to build numpy:
+
+For 32-bit,
+    ~/opt32/bin/python setup.py config --compiler=intel --fcompiler=intel config_fc --fcompiler=intel build_ext --compiler=intel install --fcompiler=intel --prefix=/home/mcclendon/opt32
+
+For 64-bit,
+    ~/opt64/bin/python setup.py config --compiler=intelem --fcompiler=intel config_fc --fcompiler=intelem build_ext --compiler=intelem --fcompiler=intel install --prefix=/home/mcclendon/opt64
+
+
+5. Build Scipy
+Go into the scipy directory
+Use your new build of Python 2.6.2 and the intel C-compiler with MKL to build scipy:
+
+For 32-bit,
+    ~/opt32/bin/python setup.py config --compiler=intel --fcompiler=intelem build_ext --compiler=intel --fcompiler=intel install --prefix=/home/mcclendon/opt32
+For 64-bit,
+     ~/opt64/bin/python setup.py config --compiler=intelem --fcompiler=intelem config_fc --fcompiler=intelem build_ext --compiler=intelem --fcompiler=intelem install --prefix=/home/mcclendon/opt64
+
+6. Build Biopython
+
+Go into biopython directory
+For 32-bit,
+  ~/opt32/bin/python setup.py build
+  ~/opt32/bin/python setup.py install
+For 64-bit,
+  ~/opt64/bin/python setup.py build
+  ~/opt64/bin/python setup.py install
+
+7. Test Biopython if desired  ... looks like some of the tests failed (7/133) perhaps due to missing 3rd-party libraries but it looked liked it built correctly.
+  ~/opt32/bin/python setup.py test
+
+  ~/opt64/bin/python setup.py test
+
+8. Install matplotlib
+   export CC=gcc
+   Go into matplotlib directory
+   ~/opt32/bin/python setup.py build
+   ~/opt32/bin/python setup.py install

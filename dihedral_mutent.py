@@ -3734,7 +3734,7 @@ class ResidueChis:
       
        
      #free up things we don't need any more, like angles, rank ordered angles, boot angles, etc.
-      #del self.angles
+      del self.angles
       del self.rank_order_angles
       del self.rank_order_angles_sequential
       del self.sorted_angles

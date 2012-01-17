@@ -923,7 +923,16 @@ def output_timeseries_chis(myfilename_prefix,myreslist,colnames, nsims = 6, nchi
    for res_ind1, myres1 in zip(range(len(reslist)), reslist):
                        print "\n#### Working on residue %s (%s):" % (myres1.num, myres1.name) , utils.flush()
                        for mychi1 in range(myres1.nchi):
-                              print "%s chi: %d/%d" % (myres1.name,int(myres1.num),mychi1+1)
+                              #print "%s chi: %d/%d" % (myres1.name,int(myres1.num),mychi1+1)
+                              #print "res_ind1: "+str(res_ind1)
+                              #rint "mychi1: "+str(mychi1)
+                              #print "nchi: " +str(nchi)
+                              #print "min_num_angles: "+str(min_num_angles)
+                              #print "res_ind1 * nchi + mychi1: "+str(res_ind1 * nchi + mychi1)
+                              #print "myres1.angles: "
+                              #print myres1.angles
+                              print "angle entries: "
+                              print myres1.angles[mychi1, :, :min_num_angles]
                               timeseries_chis_matrix[:, res_ind1 * nchi + mychi1, :] = myres1.angles[mychi1, :, :min_num_angles]
    my_file_list = []                           
    for mysim in range(nsims):
@@ -2602,7 +2611,7 @@ class ResidueChis:
             has_phipsi = False
      return has_phipsi
 
-   def _load_xvg_data(self, basedir, num_sims, max_angles, chi_dir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0):
+   def _load_xvg_data(self, basedir, num_sims, max_angles, chi_dir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0,coarse_discretize=None):
       myname = self.name
       mynumchis = self.get_num_chis(myname)
       shifted_angles = zeros((self.nchi,num_sims,max_angles),float64)
@@ -2614,7 +2623,9 @@ class ResidueChis:
       #assert num_sims == len(self.which_runs[0])
           
       res_num = str(self.xvg_resnum)
-      for chi_num in range(self.nchi):
+
+      if(coarse_discretize == None ):
+       for chi_num in range(self.nchi):
          #print "Chi:"+str(chi_num+1)+"\n"
          for sequential_sim_num in range(num_sims):
             #sim_index_str = str(self.which_runs[sequential_sim_num])
@@ -2751,10 +2762,101 @@ class ResidueChis:
             #print "sim_num "+str(sequential_sim_num)+" numangles: "+str(self.numangles[sequential_sim_num])+" shape of target array: "+str(targ_shape)+" shape of data array: "+str(data_shape)
             data[:,1] = (data[:,1] + 180)%360 - 180 #Check and make sure within -180 to 180; I think this should do it 
             self.angles[chi_num,sequential_sim_num,:self.numangles[sequential_sim_num]] = data[:,1]
-         for sequential_sim_num in range(self.num_sims): ## PATCH to fix problem with different # of angles in different sims
-             self.numangles[sequential_sim_num] = min(self.numangles[:])     ## PATCH to fix problem with different # of angles in different sims
+      
+      else: #coarse_discretize 
+             for sequential_sim_num in range(num_sims):
+                    # gf: gromacs is changing some of my residue names when I use it to read in a PDB trajectory
+                    xvg_fn_phi = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname+res_num+".xvg"
+                    xvg_fn_psi = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"psi"+myname+res_num+".xvg"
+                    def xvg_filenames_phipsi(thisname):
+                           return [basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg", \
+                                   basedir+"run"+str(sequential_sim_num+1)+chi_dir+"psi"+myname_alt+res_num+".xvg"]
+                                         
+                    if not (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                           (os.path.exists(xvg_fn_psi) or os.path.exists(xvg_fn_psi+".gz")) :
+                           if myname == "LYS":
+                                  for myname_alt in ("LYSH", "LYP"):
+                                         (xvg_fn_phi, xvg_fn_psi) = xvg_filenames_phipsi(myname_alt) 
+                                         if (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                                            (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")): break
+                           if myname == "ASP" or myname == "ASH" or myname == "AS4":
+                                  for myname_alt in ("ASH","AS4", "ASP"):
+                                         (xvg_fn_phi, xvg_fn_psi) = xvg_filenames_phipsi(myname_alt)
+                                         if (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                                            (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")): break
+                           if myname == "GLU" or myname == "GLH" or myname == "GL4":
+                                  for myname_alt in ("GLH","GL4","GLU"):
+                                         (xvg_fn_phi, xvg_fn_psi) = xvg_filenames_phipsi(myname_alt)
+                                         if (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                                            (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")): break
+                           if myname == "HIS" or myname == "HID" or myname == "HIE" or myname == "HID" or myname == "HIP":
+                                  for myname_alt in ("HISA", "HISB", "HIE", "HID", "HIS", "HIP"):
+                                         (xvg_fn_phi, xvg_fn_psi) = xvg_filenames_phipsi(myname_alt)
+                                         if (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                                            (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")): break
+                           if myname == "CYS":
+                                  for myname_alt in ("CYS2", "CYX", "CYN", "F3G"):
+                                         (xvg_fn_phi, xvg_fn_psi) = xvg_filenames_phipsi(myname_alt)
+                                         if (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                                            (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")): break
+                           if myname == "ALA":
+                                  for myname_alt in ("NALA", "NAL"):
+                                         (xvg_fn_phi, xvg_fn_psi) = xvg_filenames_phipsi(myname_alt)
+                                         if (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")) and \
+                                            (os.path.exists(xvg_fn_phi) or os.path.exists(xvg_fn_phi+".gz")): break
+                    else:
+                           xvg_fn_phi = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname+res_num+".xvg"
+                           xvg_fn_psi = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"psi"+myname+res_num+".xvg"
+                    print "pathname phi: "
+                    print xvg_fn_phi
+                    print "pathname psi: "
+                    print xvg_fn_psi
+                    if os.path.exists(xvg_fn_phi):
+                           (data_phi,titlestr)=readxvg(xvg_fn_phi,skip,skip_over_steps)
+                    elif os.path.exists(xvg_fn_phi+".gz"):
+                           (data_phi,titlestr)=readxvg(xvg_fn_phi+".gz",skip,skip_over_steps)
+                    else:
+                           print "ERROR: unable to find file '%s[.gz]'" % xvg_fn_phi
+                           sys.exit(1)
+                    if os.path.exists(xvg_fn_psi):
+                           (data_psi,titlestr)=readxvg(xvg_fn_psi,skip,skip_over_steps)
+                    elif os.path.exists(xvg_fn_phi+".gz"):
+                           (data_psi,titlestr)=readxvg(xvg_fn_psi+".gz",skip,skip_over_steps)
+                    else:
+                           print "ERROR: unable to find file '%s[.gz]'" % xvg_fn_psi
+                           sys.exit(1)
+                    self.numangles[sequential_sim_num] = len(data_phi[:,1])   
+                    data_phi[:,1] = (data_phi[:,1] + 180)%360 - 180 #Check and make sure within -180 to 180; I think this should do it
+                    data_psi[:,1] = (data_phi[:,1] + 180)%360 - 180 #Check and make sure within -180 to 180; I think this should do it
+                    #print data_phi
+                    for i in range(self.numangles[sequential_sim_num]):
+                          phi = data_phi[i,1]
+                          psi = data_psi[i,1]
+                          ## Alpha   ... these angle numbers are just fixed values...
+                          if ( -180 < phi < 0 and -100 < psi < 45):
+                                 self.angles[0,sequential_sim_num,i] = -179.9
+                                 #print "alpha"
+                          ## Beta
+                          elif ( -180 < phi < -45 and (45 < psi or psi > -135) ):
+                                 self.angles[0,sequential_sim_num,i] = -89.9
+                                 #print "beta"
+                          ## Turn
+                          elif ( 0 < phi < 180 and -90 < psi < 90):
+                                 self.angles[0,sequential_sim_num,i] = 0.1
+                                 #print "turn"
+                          ## Other
+                          else:  
+                                 self.angles[0,sequential_sim_num,i] = 90.1
+                                 #print "other"
+                    #print "self.angles:"+str(self.angles[0,sequential_sim_num])
+                    #print self.angles[0,sequential_sim_num]
 
+          
+      for sequential_sim_num in range(self.num_sims): ## PATCH to fix problem with different # of angles in different sims
+              self.numangles[sequential_sim_num] = min(self.numangles[:])     ## PATCH to fix problem with different # of angles in different sims
 
+# for phi/psi discretization, use made-up numbers like 45, 135, 215, etc. and one torsion per residue, even making temporary file if needed
+##
 
 
    
@@ -2946,7 +3048,7 @@ class ResidueChis:
        self.angles[:,:,:] = shifted_carts[:,:,:]
        #del shifted_carts
    
-   def correct_and_shift_angles(self,num_sims,bootstrap_sets,bootstrap_choose):
+   def correct_and_shift_angles(self,num_sims,bootstrap_sets,bootstrap_choose, coarse_discretize = None):
        ### Rank-order data for adaptive partitioning --
        ### note that I give the rank over the pooled data for angles from all sims
    
@@ -2967,7 +3069,7 @@ class ResidueChis:
         if(self.nchi == mynumchis + 2): #phi/psi            
                if (myname == "ASP" or myname == "GLU" or myname == "PHE" or myname == "TYR" \
                    or myname == "NASP" or myname == "NGLU" or myname == "NPHE" or myname == "NTYR" \
-                   or myname == "CASP" or myname == "CGLU" or myname == "CPHE" or myname == "CTYR"):
+                   or myname == "CASP" or myname == "CGLU" or myname == "CPHE" or myname == "CTYR") and coarse_discretize == None:
                       #last chi angle is 2-fold symmetric
                       myangles = shifted_angles[mynumchis + 1,:,:]
                       myangles[myangles > 180] = myangles[myangles > 180] - 180
@@ -2978,14 +3080,13 @@ class ResidueChis:
             if(self.nchi == mynumchis):
                    if (myname == "ASP" or myname == "GLU" or myname == "PHE" or myname == "TYR" \
                       or myname == "NASP" or myname == "NGLU" or myname == "NPHE" or myname == "NTYR" \
-                      or myname == "CASP" or myname == "CGLU" or myname == "CPHE" or myname == "CTYR"):
+                      or myname == "CASP" or myname == "CGLU" or myname == "CPHE" or myname == "CTYR") and coarse_discretize == None :
                           #last chi angle is 2-fold symmetric
                           myangles = shifted_angles[mynumchis - 1,:,:]
                           myangles[myangles > 180] = myangles[myangles > 180] - 180
                           shifted_angles[mynumchis - 1,:,:] = myangles
                           self.symmetry[mynumchis - 1] = 2
-                
-
+            
               
        self.angles[:,:,:] = shifted_angles[:,:,:]  #now actually shift the angles, important for entropy and non-adaptive partitioning correlations
        
@@ -3046,7 +3147,13 @@ class ResidueChis:
       self.sequential_res_num = sequential_res_num
       self.backbone_only, self.phipsi = backbone_only, phipsi
       self.max_num_chis = max_num_chis
-      self.nchi = self.get_num_chis(myname) * (1 - backbone_only) + phipsi * self.has_phipsi(myname)
+      coarse_discretize = None
+      if(phipsi >= 0): 
+             self.nchi = self.get_num_chis(myname) * (1 - backbone_only) + phipsi * self.has_phipsi(myname)
+      else:             #coarse discretize phi/psi into 4 bins: alpha, beta, turn, other
+             self.nchi = self.get_num_chis(myname) * (1 - backbone_only) + 1 * self.has_phipsi(myname)
+             coarse_discretize = 1
+             phipsi = 1
       if(xtcfile != None):
           self.nchi = 3 # x, y, z
       self.symmetry = ones((self.nchi),int16)
@@ -3102,7 +3209,7 @@ class ResidueChis:
       self.ent_from_sum_log_nn_dists = zeros((bootstrap_sets, self.nchi, MAX_NEAREST_NEIGHBORS),float64)
       ### load DATA
       if(xvgorpdb == "xvg"):
-         self._load_xvg_data(basedir, num_sims, max_angles, xvg_chidir, skip,skip_over_steps)
+         self._load_xvg_data(basedir, num_sims, max_angles, xvg_chidir, skip,skip_over_steps, coarse_discretize)
       if(xvgorpdb == "pdb"):
          self._load_pdb_data(all_angle_info, max_angles)
       if(xvgorpdb == "xtc"):
@@ -3113,8 +3220,8 @@ class ResidueChis:
       self.sorted_angles = zeros((self.nchi, sum(self.numangles)),float64)
 
       if(xvgorpdb == "xvg" or xvgorpdb == "pdb"):
-             self.correct_and_shift_angles(num_sims,bootstrap_sets,bootstrap_choose)
-      if(xvgorpdb == "xvg" or xvgorpdb == "pdb"):
+             self.correct_and_shift_angles(num_sims,bootstrap_sets,bootstrap_choose, coarse_discretize)
+      elif(xvgorpdb == "xtc"):
              self.correct_and_shift_carts(num_sims,bootstrap_sets,bootstrap_choose)
       
           
@@ -3734,7 +3841,7 @@ class ResidueChis:
       
        
      #free up things we don't need any more, like angles, rank ordered angles, boot angles, etc.
-      del self.angles
+      #del self.angles
       del self.rank_order_angles
       del self.rank_order_angles_sequential
       del self.sorted_angles
@@ -3947,6 +4054,7 @@ if __name__ == "__main__":
         parser.error("ERROR exactly one of --traj_fns or --xvg_basedir must be specified")
 
     print "COMMANDS: ", " ".join(sys.argv)
+    
 
     # Initialize
     resfile_fn = args[0]
@@ -3959,6 +4067,11 @@ if __name__ == "__main__":
     if options.backbone == "phipsi":
         phipsi = 2;
         backbone_only = 1
+    if options.backbone == "coarse_phipsi":
+        phipsi = -1
+        backbone_only = 1
+        print "overriding binwidth, using four bins for coarse discretized backbone"
+        options.binwidth = 90.0
     #phipsi = options.backbone.find("phipsi")!=-1
     #backbone_only = options.backbone.find("chi")==-1
     bins=arange(-180,180,options.binwidth) #Compute bin edges
@@ -4036,6 +4149,15 @@ if __name__ == "__main__":
         if run_params.load_matrices_numstructs == 0: 
                reslist = load_data(run_params)
                print "TIME to load trajectories & calculate intra-residue entropies: ", timer
+
+               prefix = run_params.get_logfile_prefix()
+               ##========================================================
+               ## Output Timeseries Data in a big matrix
+               ##========================================================
+               name_num_list = make_name_num_list(reslist)
+               timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
+               print "TIME to output timeseries data: ", timer
+        
                mut_info_res_matrix, mut_info_uncert_matrix, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg = calc_pair_stats(reslist, run_params)
                print "TIME to calculate pair stats: ", timer
 
@@ -4051,6 +4173,17 @@ if __name__ == "__main__":
         if run_params.load_matrices_numstructs == 0:
             reslist = load_data(run_params)
         print "TIME to load trajectories & calculate intra-residue entropies: ", timer
+
+        prefix = run_params.get_logfile_prefix()
+
+        ##========================================================
+        ## Output Timeseries Data in a big matrix
+        ##========================================================
+        name_num_list = make_name_num_list(reslist)
+        timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
+        print "TIME to output timeseries data: ", timer
+    
+    
         if run_params.load_matrices_numstructs == 0:
             mut_info_res_matrix, mut_info_uncert_matrix, mut_info_res_matrix_different_sims, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg = calc_pair_stats(reslist, run_params)
 
@@ -4063,8 +4196,7 @@ if __name__ == "__main__":
 
         #mut_info_res_matrix, mut_info_uncert_matrix = bootstraps_mut_inf_res_matrix.mean(axis=2), bootstraps_mut_inf_res_matrix.std(axis=2)
         #prefix = run_params.get_logfile_prefix() + "_sims%s_choose%d" % (",".join(map(str, sorted(runs_superset))), set_size)
-        prefix = run_params.get_logfile_prefix()
-
+        
     ### output results to disk
     
     ##==============================================================
@@ -4090,14 +4222,7 @@ if __name__ == "__main__":
         name_num_list = rownames
 
     
-    ##========================================================
-    ## Output Timeseries Data in a big matrix
-    ##========================================================
-
-    #timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
-    #print "TIME to output timeseries data: ", timer
     
-
     ##########################################################################################################   
     ### FINAL STATISTICAL FILTERING USING WILCOXON TEST (NEW) AND OUTPUT MATRICES
     ##########################################################################################################

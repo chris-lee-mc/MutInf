@@ -322,21 +322,21 @@ class KLdiv:
         terfile_js = open(prefix+"_ter_jsdiv.txt",'w')
         allfile_js = open(prefix+"_all_jsdiv.txt",'w')
         # first, output data for each bootstrap separately
-        bootstraps = self.kldiv_res.shape[1]
-        #for mybootstrap in range(bootstraps):
-        #    sumfile_kl_boot = open(prefix+"_sum_kldiv_bootstrap"+str(mybootstrap)+".txt",'w')
-        #    allfile_kl_boot = open(prefix+"_all_kldiv_bootstrap"+str(mybootstrap)+".txt",'w')
-        #    sumfile_js_boot = open(prefix+"_sum_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
-        #    allfile_js_boot = open(prefix+"_all_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
-        #    for res1, res2 in zip(self.reslist1, self.reslist2):
-        #        sumfile_kl_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
-        #        sumfile_js_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
-        #        allfile_kl_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
-        #        allfile_js_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
-        #    sumfile_kl_boot.close()
-        #    sumfile_js_boot.close()
-        #    allfile_kl_boot.close()
-        #    allfile_js_boot.close()
+        bootstraps = self.bootstrap_sets
+        for mybootstrap in range(bootstraps):
+            sumfile_kl_boot = open(prefix+"_sum_kldiv_bootstrap"+str(mybootstrap)+".txt",'w')
+            allfile_kl_boot = open(prefix+"_all_kldiv_bootstrap"+str(mybootstrap)+".txt",'w')
+            sumfile_js_boot = open(prefix+"_sum_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
+            allfile_js_boot = open(prefix+"_all_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
+            for res1, res2 in zip(self.reslist1, self.reslist2):
+                sumfile_kl_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
+                sumfile_js_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
+                allfile_kl_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+                allfile_js_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+            sumfile_kl_boot.close()
+            sumfile_js_boot.close()
+            allfile_kl_boot.close()
+            allfile_js_boot.close()
         
         # now, output averages over boostraps #
         counter1 = 0 #residue list counter

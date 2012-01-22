@@ -3964,7 +3964,7 @@ class ResListEntry:
 
 def load_resfile(run_params, load_angles=True, all_angle_info=None):
     rp = run_params
-    if rp.num_structs == None: rp.num_structs = 300000
+    if rp.num_structs == None: rp.num_structs = 3000000
     sequential_num = 0
     resfile=open(rp.resfile_fn,'r')
     reslines=resfile.readlines()

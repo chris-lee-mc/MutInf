@@ -1128,7 +1128,7 @@ if __name__ == "__main__":
     
     #adaptive_partitioning = (options.adaptive == "yes")  #want "yes" for second-order term
     
-    if(options.phipsichi == "coarse_phipsi"):
+    if(options.backbone == "coarse_phipsi"):
         print "overridding binwidth, setting up four bins for backbone discretization"
         options.binwidth = 90.0
 

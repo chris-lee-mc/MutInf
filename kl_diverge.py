@@ -916,7 +916,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params1 = RunParameters(resfile_fn=resfile_fn1, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs1,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array, skip=options.skip,
-                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no" )
+                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries )
        
     ### SET REFERENCE = 1 
     options.reference = 1 #as this is the one with only one bootstrap, bootstrap_choose=num_sims
@@ -925,7 +925,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params2 = RunParameters(resfile_fn=resfile_fn2, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs2,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir2, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array2, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence)  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries)  
     #but also use the subsets of the full reference ensemble to look at the variance of the local KL-divergence
 
     resfile_fn3 = resfile_fn1 #as reference is first one
@@ -934,7 +934,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params3 =  RunParameters(resfile_fn=resfile_fn3, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs3,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array3, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no")  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries)  
 
 
     ## LOAD DATA, GET A LIST OF CLASS ResidueChis ##
@@ -1111,7 +1111,7 @@ if __name__ == "__main__":
     parser.add_option("-k", "--mutual_divergence", default = "no", type =  "string", help="calculate 2nd-order terms in KL-divergence expansion")
     parser.add_option("-f", "--pdbfile", default = None, type = "string", help="pdb structure file for additional 3-coord cartesian per residue")
     parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
-    
+    parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
     
     
 

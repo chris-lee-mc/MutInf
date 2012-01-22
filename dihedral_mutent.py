@@ -3137,7 +3137,7 @@ class ResidueChis:
    def __init__(self,myname,mynum,xvg_resnum,basedir,num_sims,max_angles,xvgorpdb,binwidth,sigalpha=1,
                 permutations=0,phipsi=0,backbone_only=0,adaptive_partitioning=0,which_runs=None,pair_runs=None,bootstrap_choose=3,
                 calc_variance=False, all_angle_info=None, xvg_chidir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0, calc_mutinf_between_sims="yes", max_num_chis=99,
-                sequential_res_num = 0, pdbfile = None, xtcfile = None):
+                sequential_res_num = 0, pdbfile = None, xtcfile = None, output_timeseries = "no"):
       global xtc_coords 
       self.name = myname
       self.num = mynum
@@ -3841,7 +3841,8 @@ class ResidueChis:
       
        
      #free up things we don't need any more, like angles, rank ordered angles, boot angles, etc.
-      #del self.angles
+      if(output_timeseries != "yes"):
+             del self.angles
       del self.rank_order_angles
       del self.rank_order_angles_sequential
       del self.sorted_angles
@@ -3981,7 +3982,7 @@ def load_resfile(run_params, load_angles=True, all_angle_info=None):
        else:
               res_chain = " "
        if load_angles: 
-              reslist.append(ResidueChis(res_name,res_num, xvg_resnum, rp.xvg_basedir, rp.num_sims, rp.num_structs, rp.xvgorpdb, rp.binwidth, rp.sigalpha, rp.permutations, rp.phipsi, rp.backbone_only, rp.adaptive_partitioning, rp.which_runs, rp.pair_runs, bootstrap_choose = rp.bootstrap_choose, calc_variance=rp.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp.xvg_chidir, skip=rp.skip,skip_over_steps=rp.skip_over_steps, calc_mutinf_between_sims=rp.calc_mutinf_between_sims,max_num_chis=rp.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp.pdbfile, xtcfile=rp.xtcfile))
+              reslist.append(ResidueChis(res_name,res_num, xvg_resnum, rp.xvg_basedir, rp.num_sims, rp.num_structs, rp.xvgorpdb, rp.binwidth, rp.sigalpha, rp.permutations, rp.phipsi, rp.backbone_only, rp.adaptive_partitioning, rp.which_runs, rp.pair_runs, bootstrap_choose = rp.bootstrap_choose, calc_variance=rp.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp.xvg_chidir, skip=rp.skip,skip_over_steps=rp.skip_over_steps, calc_mutinf_between_sims=rp.calc_mutinf_between_sims,max_num_chis=rp.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp.pdbfile, xtcfile=rp.xtcfile, output_timeseries=rp.output_timeseries))
        else:  reslist.append(ResListEntry(res_name,res_num,res_chain))
        sequential_num += 1 
     return reslist
@@ -4048,6 +4049,7 @@ if __name__ == "__main__":
     parser.add_option("-f","--pdbfile", default = None, type = "string", help="pdb structure file for additional 3-coord cartesian per residue")
     parser.add_option("-q","--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
     parser.add_option("-g","--gcc", default = 'intelem', type = "string", help="numpy distutils ccompiler to use. Recommended ones intelem or gcc")
+    parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
     (options,args)=parser.parse_args()
     mycompiler = options.gcc
     if len(filter(lambda x: x==None, (options.traj_fns, options.xvg_basedir))) != 1:
@@ -4128,7 +4130,7 @@ if __name__ == "__main__":
 
     run_params = RunParameters(resfile_fn=resfile_fn, adaptive_partitioning=adaptive_partitioning, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins,
       bootstrap_set_size=options.bootstrap_set_size, sigalpha=options.sigalpha, permutations=options.permutations, num_sims=num_sims, num_structs=num_structs,
-      binwidth=options.binwidth, bins=bins, which_runs=which_runs, xvgorpdb=xvgorpdb, traj_fns=traj_fns, xvg_basedir=options.xvg_basedir, calc_variance=False, xvg_chidir=options.xvg_chidir,bootstrap_choose=options.bootstrap_set_size,pair_runs=pair_runs_array,skip=options.skip,skip_over_steps=options.zoom_to_step,calc_mutinf_between_sims=options.correct_formutinf_between_sims,load_matrices_numstructs=options.load_matrices_numstructs,plot_2d_histograms=options.plot_2d_histograms,max_num_chis=options.max_num_chis,pdbfile=options.pdbfile, xtcfile=options.xtcfile)
+      binwidth=options.binwidth, bins=bins, which_runs=which_runs, xvgorpdb=xvgorpdb, traj_fns=traj_fns, xvg_basedir=options.xvg_basedir, calc_variance=False, xvg_chidir=options.xvg_chidir,bootstrap_choose=options.bootstrap_set_size,pair_runs=pair_runs_array,skip=options.skip,skip_over_steps=options.zoom_to_step,calc_mutinf_between_sims=options.correct_formutinf_between_sims,load_matrices_numstructs=options.load_matrices_numstructs,plot_2d_histograms=options.plot_2d_histograms,max_num_chis=options.max_num_chis,pdbfile=options.pdbfile, xtcfile=options.xtcfile, output_timeseries=options.output_timeseries)
 
     print run_params
 
@@ -4155,8 +4157,9 @@ if __name__ == "__main__":
                ## Output Timeseries Data in a big matrix
                ##========================================================
                name_num_list = make_name_num_list(reslist)
-               timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
-               print "TIME to output timeseries data: ", timer
+               if run_params.output_timeseries == "yes":
+                      timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
+                      print "TIME to output timeseries data: ", timer
         
                mut_info_res_matrix, mut_info_uncert_matrix, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg = calc_pair_stats(reslist, run_params)
                print "TIME to calculate pair stats: ", timer
@@ -4180,8 +4183,9 @@ if __name__ == "__main__":
         ## Output Timeseries Data in a big matrix
         ##========================================================
         name_num_list = make_name_num_list(reslist)
-        timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
-        print "TIME to output timeseries data: ", timer
+        if run_params.output_timeseries == "yes":
+               timeseries_chis_matrix = output_timeseries_chis(prefix+"_timeseries",reslist,name_num_list,run_params.num_sims)
+               print "TIME to output timeseries data: ", timer
     
     
         if run_params.load_matrices_numstructs == 0:

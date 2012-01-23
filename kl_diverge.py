@@ -104,7 +104,9 @@ def filter_div(div_ref, div1):
 
     counter = 0 #residue list counter -- increments along residue list
     for res1, res2 in zip(div1.reslist1, div_ref.reslist1):
+        print "Residue (referece): "+str(res1.name) + " "+str(res1.num)
         for mychi in range(6):
+            print "Dihedral: "+ str(mychi + 1)
             kldiv_target_avg = average(div1.kldiv_res[counter,:,mychi])
             kldiv_refs = div_ref.kldiv_res[counter,:,mychi]
             kldiv_targs = div1.kldiv_res[counter,:,mychi]
@@ -120,7 +122,7 @@ def filter_div(div_ref, div1):
             #filter
             print "KLdiv avg total: "+str(kldiv_target_avg)
             print "KLdiv null hyp:  "+str(kldiv_null_hyp_ref)
-            print "kldiv null hyp samples > target: "+str(kldiv_num_greater_than_ref)+"\n"
+            print "kldiv null hyp samples > target: "+str(kldiv_num_greater_than_ref)
             print "KLdiv corrected: "+str(div1.kldiv_res[counter,:,mychi]) + " bias: "+str( kldiv_null_hyp_ref)
             if(kldiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
                 div1.kldiv_res[counter,:,mychi] = 0 #zero all bootstrap_sets if it is filtered out. Hope variance is zero-safe
@@ -131,11 +133,12 @@ def filter_div(div_ref, div1):
                 kldiv_targs -= kldiv_null_hyp_ref  
                 kldiv_targs[kldiv_targs < 0] = 0
                 div1.kldiv_res[counter,:,mychi] = kldiv_targs 
+            print 
                 
             #filter
             print "JSdiv avg total: "+str(jsdiv_target_avg)
             print "JSdiv null hyp:  "+str(jsdiv_null_hyp_ref)
-            print "jsdiv null hyp samples > target: "+str(jsdiv_num_greater_than_ref)+"\n"
+            print "jsdiv null hyp samples > target: "+str(jsdiv_num_greater_than_ref)
             print "JSdiv corrected: "+str(div1.jsdiv_res[counter,:,mychi]) + " bias: "+str( jsdiv_null_hyp_ref)
             if(jsdiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
                 div1.jsdiv_res[counter,:,mychi] = 0 #zero all bootstrap_sets if it is filtered out. Hope variance is zero-safe
@@ -146,6 +149,7 @@ def filter_div(div_ref, div1):
                 jsdiv_targs -= jsdiv_null_hyp_ref  
                 jsdiv_targs[jsdiv_targs < 0] = 0
                 div1.jsdiv_res[counter,:,mychi] = jsdiv_targs 
+            print
         counter += 1 
 
 
@@ -328,6 +332,7 @@ class KLdiv:
             allfile_kl_boot = open(prefix+"_all_kldiv_bootstrap"+str(mybootstrap)+".txt",'w')
             sumfile_js_boot = open(prefix+"_sum_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
             allfile_js_boot = open(prefix+"_all_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
+            counter1 = 0 #residue list counter
             for res1, res2 in zip(self.reslist1, self.reslist2):
                 sumfile_kl_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
                 sumfile_js_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
@@ -466,6 +471,10 @@ class KLdiv:
         #nchi1, nchi2 = res1.chi_pop_hist.shape[1], res2.chi_pop_hist.shape[1]
         nchi1 = res1.get_num_chis(res1.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
         nchi2 = res2.get_num_chis(res2.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
+        if self.run_params1.backbone == "coarse_phipsi":
+            nchi1 = 1
+        if self.run_params2.backbone == "coarse_phipsi":
+            nchi2 = 1
         nchi_to_use = min(nchi1, nchi2)                
         if(self.which_runs_ref == None): #this indicates we aren't doing bootstrap resampling of reference during this function call
             for mybootstrap in range(self.bootstrap_sets): #bootstraps of target
@@ -511,12 +520,12 @@ class KLdiv:
                 chi_counts2 = zeros((nchi_to_use,self.nbins),float64)
                 for myblock in range(self.subsample_choose_ref):
                     #we're only selecting the histogram of bin number = nbins, which is first variable entry "1"; a more optimal bin size could be chosen by computing kldiv from multiple
-                    print "which runs ref:"+str(self.which_runs_ref[mybootstrap,myblock])
-                    print "which runs ref comp:"+str(self.which_runs_ref_complement[mybootstrap,myblock])
-                    print  "shape of source1:" + str(shape(chi_counts1[:nchi_to_use,:]))
-                    print  "shape of target1:" + str(shape(res1.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref[mybootstrap,myblock],:nchi_to_use,:self.nbins]))
-                    print  "shape of source2:" + str(shape(chi_counts2[:nchi_to_use,:]))
-                    print  "shape of target2:" + str(shape(res2.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref_complement[mybootstrap,myblock],:nchi_to_use,:self.nbins]))
+                    #print "which runs ref:"+str(self.which_runs_ref[mybootstrap,myblock])
+                    #print "which runs ref comp:"+str(self.which_runs_ref_complement[mybootstrap,myblock])
+                    #print  "shape of source1:" + str(shape(chi_counts1[:nchi_to_use,:]))
+                    #print  "shape of target1:" + str(shape(res1.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref[mybootstrap,myblock],:nchi_to_use,:self.nbins]))
+                    #print  "shape of source2:" + str(shape(chi_counts2[:nchi_to_use,:]))
+                    #print  "shape of target2:" + str(shape(res2.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref_complement[mybootstrap,myblock],:nchi_to_use,:self.nbins]))
                     chi_counts1 += res1.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref[mybootstrap,myblock],:nchi_to_use,:self.nbins]
                     chi_counts2 += res2.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref_complement[mybootstrap,myblock],:nchi_to_use,:self.nbins]
                 
@@ -849,6 +858,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     if options.backbone == "coarse_phipsi":
         phipsi = -1
         backbone_only = 1
+        options.binwidth = 90 #override
     bins=arange(-180,180,options.binwidth) #Compute bin edges
     nbins = len(bins)
     num_sims = options.num_sims
@@ -916,7 +926,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params1 = RunParameters(resfile_fn=resfile_fn1, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs1,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array, skip=options.skip,
-                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries )
+                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone )
        
     ### SET REFERENCE = 1 
     options.reference = 1 #as this is the one with only one bootstrap, bootstrap_choose=num_sims
@@ -925,7 +935,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params2 = RunParameters(resfile_fn=resfile_fn2, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs2,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir2, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array2, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries)  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone)  
     #but also use the subsets of the full reference ensemble to look at the variance of the local KL-divergence
 
     resfile_fn3 = resfile_fn1 #as reference is first one
@@ -934,7 +944,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params3 =  RunParameters(resfile_fn=resfile_fn3, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs3,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array3, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries)  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone )  
 
 
     ## LOAD DATA, GET A LIST OF CLASS ResidueChis ##

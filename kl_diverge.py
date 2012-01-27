@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# Kullback-Leibler Divergence Program, Copyright 2011 Christopher McClendon
+# Released under Lesser GNU Public License
 
 from dihedral_mutent import *
 from optparse import OptionParser

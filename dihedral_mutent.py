@@ -1,5 +1,7 @@
-#Python script to analyze dihedrals. Usage: "python dihedral_analyze.py (list of files to plot). D. Mobley, 5/16/07"
-#from numpy import zeros, ones, arange, outer, inner, float32, float64, int16, sqrt, floor, mean, std, log, add, average, nonzero, cov, transpose, resize, array, reshape, repeat, transpose, max, array2string, sum, histogram2d, logical_and, random, sort, searchsorted, swapaxes, shape, int8, int32, all, set_printoptions, linalg, all, ceil
+# MutInf program 
+# Copyright 2010 Christopher McClendon and Gregory Friedland
+# Released under GNU Lesser Public License
+
 from numpy import *
 import re, os, sys, os.path, time, shelve
 from optparse import OptionParser

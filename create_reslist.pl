@@ -52,10 +52,15 @@ while($resline = <STRUCTFILE>)
     if($resname =~ /ACE|NMA/) { next; }
     if($resname =~ /HIE/ || $resname =~ /HIP/ || $resname =~ /HID/) { $resname = "HIS"; }
     if($resname =~ /F3G/) { $resname = "CYS";}
+    if($resname =~ /SEP/) { $resname = "SER";}
+    if($resname =~ /TYS/) { $resname = "TYR";}
     if($resline =~ /^TER/) { next; }
 	
     #opendir(RUN1, "${subdir}/run1/");
     @match_files = (); 
+    @match_files2 = (); 
+    @match_files3 = (); 
+    @match_files4 = (); 
     #grep { /phi${resname}${gchi_counter}.xvg/ } readdir(RUN1);
     #closedir(RUN1);
     #if(!($match_files[0] =~ /phi${resname}${gchi_counter}.xvg/)) {  #try HIS fix first
@@ -69,23 +74,33 @@ while($resline = <STRUCTFILE>)
 #       }
 #       
 #    }
-    if($resname == "HIS") 
+    if($resname =~ "HIS") 
     {
 	$altname = "HIE";
+	$altname2 = "HID";
+	$altname3 = "HIP";
+	print "looking also for HIE or HID\n";
     }
     else
     {
 	$altname = $resname;
+	$altname2 = $resname;
     }
 #    $altname = $resname;
-    while(!($match_files[0] =~ /phi${resname}${gchi_counter}.xvg/ || $match_files2[0] =~ /phi${altname}${gchi_counter}.xvg/ )) #while no files match
+    while(!($match_files[0] =~ /phi${resname}${gchi_counter}.xvg/ || $match_files2[0] =~ /phi${altname}${gchi_counter}.xvg/ || $match_files3[0] =~ /phi${altname2}${gchi_counter}.xvg/ || $match_files4[0] =~ /phi${altname3}${gchi_counter}.xvg/ )) #while no files match
     {
 	$gchi_counter++;
 	print("counter: $gchi_counter\n");
 	opendir(RUN1, "${subdir}/run1/");
 	print "Looking for ${subdir}/run1/phi${resname}${gchi_counter}.xvg\n";
-	@match_files = grep { /phi${resname}${gchi_counter}.xvg/ } readdir(RUN1);
-	@match_files2= grep { /phi${altname}${gchi_counter}.xvg/ } readdir(RUN1);
+	@match_files = grep { /phi${resname}${gchi_counter}.xvg/  } readdir(RUN1);
+	rewinddir(RUN1);
+	@match_files2= grep { /phi${altname}${gchi_counter}.xvg/  } readdir(RUN1);
+	rewinddir(RUN1);
+	@match_files3= grep { /phi${altname2}${gchi_counter}.xvg/ } readdir(RUN1);
+	rewinddir(RUN1);
+	@match_files4= grep { /phi${altname3}${gchi_counter}.xvg/ } readdir(RUN1);
+	#print $match_files3[0];
 	closedir(RUN1);	
 	print $match_files[0];
 	print "\n";

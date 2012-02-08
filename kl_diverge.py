@@ -327,6 +327,9 @@ class KLdiv:
         sumfile_js = open(prefix+"_sum_jsdiv.txt",'w')
         terfile_js = open(prefix+"_ter_jsdiv.txt",'w')
         allfile_js = open(prefix+"_all_jsdiv.txt",'w')
+        pymolfile_kl = open(prefix+"_kldiv.pml",'w')
+        pymolfile_js = open(prefix+"_jsdiv.pml",'w')
+        PDB_input = self.run_params1.pdbfile
         # first, output data for each bootstrap separately
         bootstraps = self.bootstrap_sets
         for mybootstrap in range(bootstraps):
@@ -373,8 +376,24 @@ class KLdiv:
             allfile_chisq.write(str(res1.name)+str(res1.num)+" "+fmt_floats(list((average(self.chisq_res[counter1,:,-1],axis=0)).flatten()), digits=6, length=9)+"\n")
             counter1 += 1
 
-            
-            
+            ### Write Pymol Session Files ####
+            print "Writing Pymol Session Files"
+            pymolfile_kl.write("from pymol import cmd")
+            pymolfile_kl.write("load system, "+str(PDB_input)+"_kldiv.pdb")
+            pymolfile_kl.write("preset.b_factor_putty('system'),_self=cmd")
+            pymolfile_kl.write("sele b0, b < 0.00001")
+            pymolfile_kl.write("cmd.color(5278, 'b0')")
+            pymolfile_kl.write("cmd.disable('b0')")
+            pymolfile_kl.write("cmd.bg_color('white')")
+
+            pymolfile_js.write("from pymol import cmd")
+            pymolfile_js.write("load system, "+str(PDB_input)+"_jsdiv.pdb")
+            pymolfile_js.write("preset.b_factor_putty('system'),_self=cmd")
+            pymolfile_js.write("sele b0, b < 0.00001")
+            pymolfile_js.write("cmd.color(5278, 'b0')")
+            pymolfile_js.write("cmd.disable('b0')")
+            pymolfile_js.write("cmd.bg_color('white')")
+
         maxfile_kl.close()
         sumfile_kl.close()
         terfile_kl.close()

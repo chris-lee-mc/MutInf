@@ -933,8 +933,8 @@ def output_timeseries_chis(myfilename_prefix,myreslist,colnames, nsims = 6, nchi
                               #print "res_ind1 * nchi + mychi1: "+str(res_ind1 * nchi + mychi1)
                               #print "myres1.angles: "
                               #print myres1.angles
-                              print "angle entries: "
-                              print myres1.angles[mychi1, :, :min_num_angles]
+                              #print "angle entries: "
+                              #print myres1.angles[mychi1, :, :min_num_angles]
                               timeseries_chis_matrix[:, res_ind1 * nchi + mychi1, :] = myres1.angles[mychi1, :, :min_num_angles]
    my_file_list = []                           
    for mysim in range(nsims):

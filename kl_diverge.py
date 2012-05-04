@@ -11,6 +11,64 @@ from Bio.PDB.PDBParser import PDBParser
 
 global adaptive_partitioning
 
+def load_two_resfiles(run_params1, run_params2, load_angles=True, all_angle_info=None):
+        rp1 = run_params1
+        rp2 = run_params2
+        if rp1.num_structs == None: rp1.num_structs = 1500000
+        if rp2.num_structs == None: rp2.num_structs = 1500000
+        sequential_num = 0
+        resfile1=open(rp1.resfile_fn,'r')
+        reslines1=resfile1.readlines()
+        resfile1.close()
+        resfile2=open(rp2.resfile_fn,'r')
+        reslines2=resfile2.readlines()
+        resfile2.close()
+        reslist1 = []
+        reslist2 = []
+        for resline1, resline2 in zip(reslines1, reslines2):
+            if (len(resline1.strip()) == 0) or  ((len(resline1.strip()) == 0)): continue
+            for iteration in range(2):
+                xvg_resnum, res_name, res_numchain = resline1.split()
+                myexpr = re.compile(r"([0-9]+)([A-Z]*)")
+                matches = myexpr.match(res_numchain)
+                res_num = matches.group(1)
+                if matches.group(2) != None:
+                    res_chain = matches.group(2)
+                else:
+                    res_chain = " "
+                if load_angles: 
+                    if(iteration == 0):
+                        minmax1 = ResidueChis(res_name,res_num, xvg_resnum, rp1.xvg_basedir, rp1.num_sims, rp1.num_structs, rp1.xvgorpdb, rp1.binwidth, rp1.sigalpha, rp1.permutations, rp1.phipsi, rp1.backbone_only, rp1.adaptive_partitioning, rp1.which_runs, rp1.pair_runs, bootstrap_choose = rp1.bootstrap_choose, calc_variance=rp1.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp1.xvg_chidir, skip=rp1.skip,skip_over_steps=rp1.skip_over_steps, calc_mutinf_between_sims=rp1.calc_mutinf_between_sims,max_num_chis=rp1.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp1.pdbfile, xtcfile=rp1.xtcfile, output_timeseries=rp1.output_timeseries, bailout_early=True )
+                        print "min value: "+str(minmax1.minmax[0])
+                    else: #this time with min/max supplied
+                        reslist1.append(ResidueChis(res_name,res_num, xvg_resnum, rp1.xvg_basedir, rp1.num_sims, rp1.num_structs, rp1.xvgorpdb, rp1.binwidth, rp1.sigalpha, rp1.permutations, rp1.phipsi, rp1.backbone_only, rp1.adaptive_partitioning, rp1.which_runs, rp1.pair_runs, bootstrap_choose = rp1.bootstrap_choose, calc_variance=rp1.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp1.xvg_chidir, skip=rp1.skip,skip_over_steps=rp1.skip_over_steps, calc_mutinf_between_sims=rp1.calc_mutinf_between_sims,max_num_chis=rp1.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp1.pdbfile, xtcfile=rp1.xtcfile, output_timeseries=rp1.output_timeseries, minmax=minmax1.minmax ))
+                        del minmax1
+                if (load_angles != True): 
+                    if (iteration == 1):
+                        reslist.append(ResListEntry(res_name,res_num,res_chain))
+                
+                xvg_resnum, res_name, res_numchain = resline2.split()
+                myexpr = re.compile(r"([0-9]+)([A-Z]*)")
+                matches = myexpr.match(res_numchain)
+                res_num = matches.group(1)
+                if matches.group(2) != None:
+                    res_chain = matches.group(2)
+                else:
+                    res_chain = " "
+                if load_angles: 
+                    if(iteration == 0):
+                        minmax2 = ResidueChis(res_name,res_num, xvg_resnum, rp2.xvg_basedir, rp2.num_sims, rp2.num_structs, rp2.xvgorpdb, rp2.binwidth, rp2.sigalpha, rp2.permutations, rp2.phipsi, rp2.backbone_only, rp2.adaptive_partitioning, rp2.which_runs, rp2.pair_runs, bootstrap_choose = rp2.bootstrap_choose, calc_variance=rp2.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp2.xvg_chidir, skip=rp2.skip,skip_over_steps=rp2.skip_over_steps, calc_mutinf_between_sims=rp2.calc_mutinf_between_sims,max_num_chis=rp2.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp2.pdbfile, xtcfile=rp2.xtcfile, output_timeseries=rp2.output_timeseries, bailout_early = True)
+                        print "min value: "+str(minmax2.minmax[0])
+                    else: #this time with min/max supplied
+                        reslist2.append(ResidueChis(res_name,res_num, xvg_resnum, rp2.xvg_basedir, rp2.num_sims, rp2.num_structs, rp2.xvgorpdb, rp2.binwidth, rp2.sigalpha, rp2.permutations, rp2.phipsi, rp2.backbone_only, rp2.adaptive_partitioning, rp2.which_runs, rp2.pair_runs, bootstrap_choose = rp2.bootstrap_choose, calc_variance=rp2.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp2.xvg_chidir, skip=rp2.skip,skip_over_steps=rp2.skip_over_steps, calc_mutinf_between_sims=rp2.calc_mutinf_between_sims,max_num_chis=rp2.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp2.pdbfile, xtcfile=rp2.xtcfile, output_timeseries=rp2.output_timeseries, minmax=minmax2.minmax ))
+                        del minmax2
+                if (load_angles != True): 
+                    if (iteration == 1):
+                        reslist.append(ResListEntry(res_name,res_num,res_chain))
+            sequential_num += 1 
+        return reslist1, reslist2
+
+
 def Grassberger_KLdiv(nj, ni, numangles1, numangles2):
     ## Here, nj are the reference counts
     # This is based on the Renyi generalized divergence using Grassberger's (1988 Phys Lett A) estimate of pi and pj
@@ -87,7 +145,7 @@ def Grassberger_KLdiv(nj, ni, numangles1, numangles2):
 
 
 
-def filter_div(div_ref, div1):
+def filter_div(div_ref, div_ref2, div1):
     #  If the "target" ensemble is the same as the equilibrium ensemble, this quantity will be zero. However, this is not often the case due to sample variability. Furthermore, if applied naively, it might be difficult to extract meaningful population shifts due to different simulation conditions versus artefactual popualtion shifts due to sample variability. In order to improve the signal-to-noise ratio in our calculation the Kullback-Leibler Divergence and thereby capture meaningful differences between conformational ensembles, we will calculate the K-L Divergence expected from sample variability in the "reference" ensemble and use it for a significance test and to correct the calculated values.
     
     
@@ -105,9 +163,9 @@ def filter_div(div_ref, div1):
     #  \end{equation}
 
     counter = 0 #residue list counter -- increments along residue list
-    for res1, res2 in zip(div1.reslist1, div_ref.reslist1):
-        print "Residue (referece): "+str(res1.name) + " "+str(res1.num)
-        for mychi in range(6):
+    for res1, res2, res3 in zip(div1.reslist1, div_ref.reslist1, div_ref2.reslist1):
+       print "Residue (referece): "+str(res1.name) + " "+str(res1.num)
+       for mychi in range(6):
             print "Dihedral: "+ str(mychi + 1)
             kldiv_target_avg = average(div1.kldiv_res[counter,:,mychi])
             kldiv_refs = div_ref.kldiv_res[counter,:,mychi]
@@ -116,11 +174,12 @@ def filter_div(div_ref, div1):
             kldiv_num_greater_than_ref = len(kldiv_refs[kldiv_refs > kldiv_target_avg]) #how many of ref sub-ensembles have a KLdiv wrt full ref ensemble greater than the KLdiv of the target
             bootstrap_sets = div1.bootstrap_sets
             jsdiv_target_avg = average(div1.jsdiv_res[counter,:,mychi])
-            jsdiv_refs = div_ref.jsdiv_res[counter,:,mychi]
+            jsdiv_refs  = div_ref.jsdiv_res[counter,:,mychi]
+            jsdiv_refs2 = div_ref2.jsdiv_res[counter,:,mychi]
             jsdiv_targs = div1.jsdiv_res[counter,:,mychi]
-            jsdiv_null_hyp_ref = average(div_ref.jsdiv_res[counter,:,mychi]) #average over bootstraps
-            jsdiv_num_greater_than_ref = len(jsdiv_refs[jsdiv_refs > jsdiv_target_avg]) #how many of ref sub-ensembles have a JSdiv wrt full ref ensemble greater than the avg JSdiv of the target
-           
+            jsdiv_null_hyp_ref = (average(div_ref.jsdiv_res[counter,:,mychi]) + average(div_ref2.jsdiv_res[counter,:,mychi])) / 2.0 #average over bootstraps
+            jsdiv_num_greater_than_ref = len(jsdiv_refs[jsdiv_refs > jsdiv_target_avg]) + len(jsdiv_refs[jsdiv_refs2 > jsdiv_target_avg]) #how many of sub-ensembles of reference or sub-ensembles of target  have a JSdiv greater than the avg JSdiv between ref and target
+            
             #filter
             print "KLdiv avg total: "+str(kldiv_target_avg)
             print "KLdiv null hyp:  "+str(kldiv_null_hyp_ref)
@@ -142,7 +201,7 @@ def filter_div(div_ref, div1):
             print "JSdiv null hyp:  "+str(jsdiv_null_hyp_ref)
             print "jsdiv null hyp samples > target: "+str(jsdiv_num_greater_than_ref)
             print "JSdiv corrected: "+str(div1.jsdiv_res[counter,:,mychi]) + " bias: "+str( jsdiv_null_hyp_ref)
-            if(jsdiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
+            if(jsdiv_num_greater_than_ref/(bootstrap_sets * 2) > div1.sigalpha): # divide by two times bootstrap_sets for since added two tail distributions above for JSDiv within target and within reference sub-ensembles 
                 div1.jsdiv_res[counter,:,mychi] = 0 #zero all bootstrap_sets if it is filtered out. Hope variance is zero-safe
                 print "this torsion's JS divergence was not significant. and will be set to zero"
             else:
@@ -152,7 +211,7 @@ def filter_div(div_ref, div1):
                 jsdiv_targs[jsdiv_targs < 0] = 0
                 div1.jsdiv_res[counter,:,mychi] = jsdiv_targs 
             print
-        counter += 1 
+       counter += 1 
 
 
 
@@ -378,8 +437,14 @@ class KLdiv:
 
         ### Write Pymol Session Files ####
         print "Writing Pymol Session Files"
+	
+	postfix = ""
+        prefix=str(self.run_params1.resfile_fn)+str(self.run_params2.resfile_fn)
+        kl_pdbfile = prefix + "_kldiv" + postfix + ".pdb"
+        js_pdbfile = prefix + "_jsdiv" + postfix + ".pdb"
+        
         pymolfile_kl.write("from pymol import cmd"+"\n")
-        pymolfile_kl.write("load system, "+str(PDB_input)+"_kldiv.pdb"+"\n")
+        pymolfile_kl.write("load "+str(kl_pdbfile)+", system \n")
         pymolfile_kl.write("preset.b_factor_putty('system'),_self=cmd"+"\n")
         pymolfile_kl.write("sele b0, b < 0.00001"+"\n")
         pymolfile_kl.write("cmd.color(5278, 'b0')"+"\n")
@@ -387,7 +452,7 @@ class KLdiv:
         pymolfile_kl.write("cmd.bg_color('white')"+"\n")
         
         pymolfile_js.write("from pymol import cmd"+"\n")
-        pymolfile_js.write("load system, "+str(PDB_input)+"_jsdiv.pdb"+"\n")
+        pymolfile_js.write("load "+str(js_pdbfile)+", system \n")
         pymolfile_js.write("preset.b_factor_putty('system'),_self=cmd"+"\n")
         pymolfile_js.write("sele b0, b < 0.00001"+"\n")
         pymolfile_js.write("cmd.color(5278, 'b0')"+"\n")
@@ -406,6 +471,8 @@ class KLdiv:
         sumfile_chisq.close()
         terfile_chisq.close()
         allfile_chisq.close()
+	pymolfile_kl.close()
+	pymolfile_js.close()
     
     #########################################################################################################################################
     ### _KL_innerloop_calc_ : For two vectors of pdf's (maximum 6 dimensions), calculates 1st-order KLdiv, JSdiv, Chi-Squared  
@@ -549,7 +616,7 @@ class KLdiv:
                     #print  "shape of target2:" + str(shape(res2.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref_complement[mybootstrap,myblock],:nchi_to_use,:self.nbins]))
                     chi_counts1 += res1.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref[mybootstrap,myblock],:nchi_to_use,:self.nbins]
                     chi_counts2 += res2.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref_complement[mybootstrap,myblock],:nchi_to_use,:self.nbins]
-                
+                    
                     #...if we wanted to instead grab from the original bins data .... 
                     #leftstop1  = subsample_block_size * (self.which_runs_ref_complement[mybootstrap,myblock])
                     #rightstop1 = subsample_block_size * (self.which_runs_ref_complement[mybootstrap,myblock] + 1)
@@ -892,6 +959,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     print "number of simulations to take at a time as bootstrap samples:"+str(options.bootstrap_set_size)+"\n"
     which_runs1 = []
     pair_runs_list = []
+    #perhaps should use xuniquePermutations instead 
     for myruns in xuniqueCombinations(range(num_sims), options.num_sims): #only one bootstrap for reference
         which_runs1.append(myruns)
 
@@ -961,6 +1029,9 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
 
     resfile_fn3 = resfile_fn1 #as reference is first one
     which_runs3 = which_runs2 #though with bootstraps just like the target
+    resfile_fn4 = resfile_fn2 #need reference for target also for JSDiv
+    which_runs4 = which_runs2 #again with bootstraps just like the target
+    
     pair_runs_array3 = pair_runs_array2
     run_params3 =  RunParameters(resfile_fn=resfile_fn3, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs3,
@@ -968,15 +1039,27 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
                                 bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone )  
 
 
+    pair_runs_array4 = pair_runs_array2
+    run_params4 =  RunParameters(resfile_fn=resfile_fn4, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
+                                num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs4,
+                                xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array4, skip=options.skip,
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no")  
+    
+    
     ## LOAD DATA, GET A LIST OF CLASS ResidueChis ##
 
-    reslist1 = load_resfile(run_params1, load_angles=True)
-    reslist2 = load_resfile(run_params2, load_angles=True)
+    if (options.minmax=="yes"):
+	    reslist1, reslist2 = load_two_resfiles(run_params1, run_params2, load_angles=True)
+    else:
+	    reslist1 = load_resfile(run_params1, load_angles=True)
+	    reslist2 = load_resfile(run_params2, load_angles=True)
+
     if(options.bootstrap_set_size < num_sims):  #if we're using statistical filtering
         print "\n loading bootstrap samples of reference for statistics\n"
         reslist3 = load_resfile(run_params3, load_angles=True)
         print "\n calculating KLdiv for reference ensemble\n"
         mykldiv_ref = KLdiv(run_params1, run_params3, reslist1, reslist3)
+        mykldiv_ref2 = KLdiv(run_params2, run_params3, reslist2, reslist3)
         print "\n outputting reference kldiv's\n:"
         mykldiv_ref.output()
         ## CALC KLdiv ##
@@ -986,18 +1069,22 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
             mykldiv_ref = KLdiv(run_params1, run_params1, reslist1, reslist1, \
                                 which_runs_ref=which_runs_ref, which_runs_ref_complement=which_runs_ref_complement, \
                                 do_bootstraps_with_complements = True)
-            print "\n outputting reference kldiv's:\n"
-            mykldiv_ref.output()
+            mykldiv_ref2 = KLdiv(run_params2, run_params2, reslist2, reslist2, \
+                                which_runs_ref=which_runs_ref, which_runs_ref_complement=which_runs_ref_complement, \
+                                do_bootstraps_with_complements = True)
+            #print "\n outputting reference kldiv's:\n"
+            #mykldiv_ref.output()
+            #mykldiv_ref2.output()
             
     
     mykldiv     = KLdiv(run_params1, run_params2, reslist1, reslist2)
-    
+    #myjsdiv2    = KLdiv(run_params2, run_params1, reslist2, reslist1)
     ## Statistical Filtering on mykldiv given reference ##
     #if(options.bootstrap_set_size < num_sims): #if we're using statistical filtering
     if(options.num_sims > 1):
         print "\n filtering KLdiv and JSdiv using Null distribution from reference\n"
         oldkldiv = copy(mykldiv)
-        filter_div(mykldiv_ref, mykldiv)
+        filter_div(mykldiv_ref, mykldiv_ref2, mykldiv)
 
     ## Output Results ##
     print "\n outputting target kldiv's\n"
@@ -1130,7 +1217,7 @@ if __name__ == "__main__":
     parser.add_option("-w", "--binwidth", default=15.0, type="float", help="width of the bins in degrees")
     parser.add_option("-n", "--num_sims", default=None, type="int", help="number of simulations")
     parser.add_option("-d", "--xvg_chidir", default = "/", type ="string", help="subdirectory under xvg_basedir/run# where chi angles are stored")
-    parser.add_option("-a", "--adaptive", default = "no", type ="string", help="adaptive partitioning (yes|no)")
+    parser.add_option("-a", "--minmax", default = "no", type ="string", help="adaptive min,max (yes|no)")
     parser.add_option("-b", "--backbone", default = "phipsichi", type = "string", help="chi: just sc  phipsi: just bb  phipsichi: bb + sc, coarse_phipsi: alpha, beta, turn, coil (4-bin discretization, use only with option -w 90)")
     parser.add_option("-s", "--sigalpha", default=0.1, type="float", help="p-value threshold for statistical filtering, lower is stricter")
     parser.add_option("-i", "--skip", default = 1, type = "int", help="interval between snapshots to consider, in whatever units of time snapshots were output in")
@@ -1143,7 +1230,7 @@ if __name__ == "__main__":
     parser.add_option("-f", "--pdbfile", default = None, type = "string", help="pdb structure file for additional 3-coord cartesian per residue")
     parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
     parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
-    
+    options.adaptive = "no" # KLdiv first order cannot use adaptive partitioning unless dihedrals were ranked ordered for two systems (i.e. residue lists) together
     
 
 

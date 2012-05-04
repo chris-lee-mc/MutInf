@@ -142,7 +142,7 @@ OFF_DIAG = 1 #set to "1" to look at off-diagonal terms
 OUTPUT_DIAG = 1  #set to "1" to output flat files for diagonal matrix elements
 EACH_BOOTSTRAP_MATRIX = 1 #set to "1" to output flat files for each bootstrapped matrix
 MULT_1D_BINS = 3 #set to "3" or more for MULT_1D_BINS times the number of 1-D bins for 1-D entropy only; single and double already done by defualt
-SAFE_1D_BINS = 7 # approximately 2PI bins so that continuous h(x) = H(x, discrete) + log (binwidth)
+SAFE_1D_BINS = 18 # now 20 degrees # can be approximately 2PI bins so that continuous h(x) = H(x, discrete) + log (binwidth)
 FEWER_COR_BTW_BINS = 0.5 #set to "0.5" for half as many 2-D bins for 2-D correlation between tors in different sims, nbins must be an even number for this to be appropriate!
 MAX_NEAREST_NEIGHBORS = 1 # up to k nearest neighbors
 #SPEED = "vfast" # set to "vfast" to use the vfast_cov(); "fast" to use fast_cov(); "*" to use cov()
@@ -213,7 +213,7 @@ class vonMises:
         self.k2 = k2
         self.l1 = l1
         self.l2 = l2
-        self.lamd = lamd; #lamda coupling parameter
+        self.lambd = lambd; #lambda coupling parameter
         self.C = 0 #normalization constant 
         for i in range(100): #compute C using rapdily-converging infinite series
             self.C += misc.comb(2*i,i,exact=1) * ((self.lambd ** 2)/(4*self.k1*self.k2) ** i) * special.iv(i,self.k1) * special.iv(i, self.k2)
@@ -3041,14 +3041,56 @@ class ResidueChis:
        myname = self.name
        mynumchis = self.get_num_chis(myname)
        # shift cartesians to [0, 360] so binning will be compatible for angular data
+       # we don't know if all the sims are aligned togther.. if so, then shifting shoud be done for whole dataset not each sim separately 
        for i in range((shape(shifted_carts))[0]):
               for j in range ((shape(shifted_carts))[1]):
-                     shifted_carts[i,j,:] = shifted_carts[i,j,:] + average(shifted_carts[i,j,:])
+                     shifted_carts[i,j,:] = shifted_carts[i,j,:] - average(shifted_carts[i,j,:])
                      shifted_carts[i,j,:] = shifted_carts[i,j,:] * 360.0 / \
                                             (max(shifted_carts[i,j,:]) - min(shifted_carts[i,j,:]))
        
        self.angles[:,:,:] = shifted_carts[:,:,:]
        #del shifted_carts
+
+   def expand_contract_data(self,num_sims,bootstrap_sets,bootstrap_choose):
+       shifted_data = self.angles.copy()
+       myname = self.name
+       mynumchis = self.get_num_chis(myname)
+       mymin = self.minmax[0,:]
+       mymax = self.minmax[1,:]
+       mymin_array1 = zeros((num_sims), float64)
+       mymin_array2 = zeros((num_sims, shape(self.angles)[-1]), float64)
+       mymax_array1 = zeros((num_sims), float64)
+       mymax_array2 = zeros((num_sims, shape(self.angles)[-1]), float64)
+       
+       # shift data to [0, 360] so binning will be compatible for max and min of data
+       # have center of data be max - min / 2 rather than average
+       for mychi in range(self.nchi):
+              mymin_array1[:] = mymin[mychi]
+              mymin_array2[:, :] = resize(mymin_array1,shape(mymin_array2))
+              mymax_array1[:] = mymax[mychi]
+              mymax_array2[:, :] = resize(mymax_array1,shape(mymax_array2))
+
+              #midpoint = ( mymax_array2[:,:] - mymin_array2[:,:] ) / 2.0 
+              zeropoint =  mymin_array2[:,:] 
+              # no recentering, as I think it might introduce bias
+              # rather, we just stretch the range by setting the min to zero,
+              # then grabbing on the max and pulling it to 360
+              shifted_data[mychi,:,:] = shifted_data[mychi,:,:] - zeropoint 
+              shifted_data[mychi,:,:] = shifted_data[mychi,:,:] * 360.0 / \
+                                            ( mymax_array2[:,:] - mymin_array2[:,:] ) #+ midpoint ##if using midpoint recentering
+              shifted_data[mychi,:,:] = (shifted_data[mychi,:,:])%360  #Check and make sure within 0 to 360
+            
+       for mysim in range(num_sims):
+              shifted_data[:,mysim,self.numangles[mysim]:] = 0
+       print "orig data:"
+       print self.angles[mychi,0,:min(self.numangles)]
+       print "data range:"
+       print mymin_array1
+       print mymax_array1
+       print "reshaped data:"
+       print shifted_data[mychi,0,:min(self.numangles)]
+       self.angles[:,:,:] = shifted_data[:,:,:]
+       #del shifted_data
    
    def correct_and_shift_angles(self,num_sims,bootstrap_sets,bootstrap_choose, coarse_discretize = None):
        ### Rank-order data for adaptive partitioning --
@@ -3139,7 +3181,7 @@ class ResidueChis:
    def __init__(self,myname,mynum,xvg_resnum,basedir,num_sims,max_angles,xvgorpdb,binwidth,sigalpha=1,
                 permutations=0,phipsi=0,backbone_only=0,adaptive_partitioning=0,which_runs=None,pair_runs=None,bootstrap_choose=3,
                 calc_variance=False, all_angle_info=None, xvg_chidir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0, calc_mutinf_between_sims="yes", max_num_chis=99,
-                sequential_res_num = 0, pdbfile = None, xtcfile = None, output_timeseries = "no"):
+                sequential_res_num = 0, pdbfile = None, xtcfile = None, output_timeseries = "no", minmax = None, bailout_early = False):
       global xtc_coords 
       self.name = myname
       self.num = mynum
@@ -3209,6 +3251,8 @@ class ResidueChis:
       #self.ent_hist_left_breaks = zeros((self.nchi, nbins * MULT_1D_BINS + 1),float64)
       #self.ent_hist_binwidths = zeros((bootstrap_sets, self.nchi, nbins * MULT_1D_BINS),float64)
       self.ent_from_sum_log_nn_dists = zeros((bootstrap_sets, self.nchi, MAX_NEAREST_NEIGHBORS),float64)
+      self.minmax = zeros((2,self.nchi))
+      self.minmax[1,:] += 1 #to avoid zero in divide in expand_contract angles
       ### load DATA
       if(xvgorpdb == "xvg"):
          self._load_xvg_data(basedir, num_sims, max_angles, xvg_chidir, skip,skip_over_steps, coarse_discretize)
@@ -3223,10 +3267,34 @@ class ResidueChis:
 
       if(xvgorpdb == "xvg" or xvgorpdb == "pdb"):
              self.correct_and_shift_angles(num_sims,bootstrap_sets,bootstrap_choose, coarse_discretize)
-      elif(xvgorpdb == "xtc"):
+      
+      if(minmax == None):
+             print "getting min/max values"
+             mymin = zeros(self.nchi)
+             mymax = zeros(self.nchi)
+             for mychi in range(self.nchi):
+                    mymin[mychi] =  min((self.angles[mychi,:,:min(self.numangles)]).flatten())
+                    mymax[mychi] =  max((self.angles[mychi,:,:min(self.numangles)]).flatten())
+             print "__init__ mymin: "
+             print mymin
+             print "__init__ mymax: "
+             print mymax
+             self.minmax[0, :] = mymin
+             self.minmax[1, :] = mymax
+             for mychi in range(self.nchi):
+                    if(self.minmax[1,mychi] - self.minmax[0,mychi] <= 0):
+                           self.minmax[1,mychi] = self.minmax[0,mychi] + 1
+             print self.minmax
+      else:
+             self.minmax = minmax
+             self.expand_contract_data(num_sims,bootstrap_sets,bootstrap_choose)
+      
+      if(xvgorpdb == "xtc"):
              self.correct_and_shift_carts(num_sims,bootstrap_sets,bootstrap_choose)
       
-          
+      if(bailout_early == True): #if we just want the angles and especially the min and max values without the binning, etc....
+             print "bailing out early with min/max values"
+             return
       
 
       inv_binwidth = 1.0 / binwidth
@@ -3988,6 +4056,7 @@ def load_resfile(run_params, load_angles=True, all_angle_info=None):
        else:  reslist.append(ResListEntry(res_name,res_num,res_chain))
        sequential_num += 1 
     return reslist
+
 
 
 # Load angle data and calculate intra-residue entropies

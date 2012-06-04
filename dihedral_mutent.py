@@ -3605,8 +3605,6 @@ class ResidueChis:
                     
                     for (int anglenum=0; anglenum< mynumangles; anglenum++) {
                       angle = *(boot_ranked_angles + mychi*bootstrap_sets*bootstrap_choose*max_angles + mybootstrap*bootstrap_choose*max_angles +mynumangles_sum + anglenum);
-                      if(angle > 360) angle = angle - 360;
-                      if(angle <= 0.000001) angle = 0.0000011;
                       //printf("chi:%i sim:%i rank:%i\\n",mychi, simnum, angle); 
                       bin1 = int(double(angle)*inv_binwidth_adaptive);
                       if (bin1 < 0) bin1 = 0;

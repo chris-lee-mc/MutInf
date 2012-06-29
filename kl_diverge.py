@@ -1230,17 +1230,14 @@ if __name__ == "__main__":
     parser.add_option("-f", "--pdbfile", default = None, type = "string", help="pdb structure file for additional 3-coord cartesian per residue")
     parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
     parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
-    options.adaptive = "no" # KLdiv first order cannot use adaptive partitioning unless dihedrals were ranked ordered for two systems (i.e. residue lists) together
     
-
-
-
 
     ## SETUP RUN PARAMETERS ##    
     run_params1 = 'None'
     run_params2 = 'None'
     run_params3 = 'None'
     (options,args)=parser.parse_args()
+    options.adaptive = "no" # KLdiv first order cannot use adaptive partitioning unless dihedrals were ranked ordered for two systems (i.e. residue lists) together
     
     print "COMMANDS: ", " ".join(sys.argv)
     

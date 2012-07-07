@@ -445,7 +445,7 @@ class KLdiv:
         
         pymolfile_kl.write("from pymol import cmd"+"\n")
         pymolfile_kl.write("load "+str(kl_pdbfile)+", system \n")
-        pymolfile_kl.write("preset.b_factor_putty('system'),_self=cmd"+"\n")
+        pymolfile_kl.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
         pymolfile_kl.write("sele b0, b < 0.00001"+"\n")
         pymolfile_kl.write("cmd.color(5278, 'b0')"+"\n")
         pymolfile_kl.write("cmd.disable('b0')"+"\n")

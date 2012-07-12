@@ -402,6 +402,7 @@ class KLdiv:
                 sumfile_js_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
                 allfile_kl_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
                 allfile_js_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+		counter1 += 1
             sumfile_kl_boot.close()
             sumfile_js_boot.close()
             allfile_kl_boot.close()

@@ -432,7 +432,7 @@ class KLdiv:
             maxfile_chisq.write(str(res1.name)+str(res1.num)+" "+str(amax(average(self.chisq_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
             sumfile_chisq.write(str(res1.name)+str(res1.num)+" "+str(sum(average(self.chisq_res[counter1,:,:],axis=0)))+"\n")
             terfile_chisq.write(str(res1.name)+str(res1.num)+" "+str(average(self.chisq_res[counter1,:,-1],axis=0))+"\n")
-            allfile_chisq.write(str(res1.name)+str(res1.num)+" "+fmt_floats(list((average(self.chisq_res[counter1,:,-1],axis=0)).flatten()), digits=6, length=9)+"\n")
+            allfile_chisq.write(str(res1.name)+str(res1.num)+" "+fmt_floats(list((average(self.chisq_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
             counter1 += 1
 
         ### Write Pymol Session Files ####

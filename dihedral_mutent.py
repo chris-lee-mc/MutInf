@@ -2891,7 +2891,7 @@ class ResidueChis:
              extra_record = 1
       print "sequential residue number: "+str(self.sequential_res_num)
       for sequential_sim_num in range(num_sims):
-             xtc_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+xtcfile+str(sequential_sim_num)+".xtc"
+             xtc_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+xtcfile+str(sequential_sim_num+1)+".xtc"
              pdb_fn = pdbfile
              if os.path.exists(xtc_fn) and os.path.exists(pdb_fn):
                  if (xtc_and_pdb_data == []):

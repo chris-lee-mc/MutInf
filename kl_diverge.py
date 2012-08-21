@@ -505,7 +505,8 @@ class KLdiv:
                         #Jensen-Shannon Divergence
                         #print "jsdiv test"+str(0.5 * sum(pj * log (pj/(0.5*pi+0.5*pj+SMALL)), axis=-1) + 0.5 * sum(pi * log (pi/(0.5*pi + 0.5*pj+SMALL)), axis=-1))
                         jsdiv2[mychi] = 0.5 * sum(pj * log (pj/(0.5*pi+0.5*pj+SMALL)), axis=-1) + 0.5 * sum(pi * log (pi/(0.5*pi + 0.5*pj+SMALL)), axis=-1)
-
+			
+			
                 if(self.run_params1.options.grassberger == "no" and self.run_params1.options.abs == "yes"):
                     for mychi in range(nchi_to_use):
                         try:
@@ -516,6 +517,7 @@ class KLdiv:
                             exit 
                         #kldiv1[mychi] = sum(abs(pi[pj > SMALL] * log (pi[pj > 0 + SMALL]/pj[pj > 0 + SMALL])), axis=-1)
                         kldiv2[mychi] = sum(abs(pj[pi > SMALL] * log (pj[pi > 0 + SMALL]/pi[pi > 0 + SMALL])), axis=-1)
+			jsdiv2[mychi] = 0.5 * sum(abs(pj * log (pj/(0.5*pi+0.5*pj+SMALL))), axis=-1) + 0.5 * sum(abs(pi * log (pi/(0.5*pi + 0.5*pj+SMALL))), axis=-1)
                 if(self.run_params1.options.grassberger == "yes"):
                     for mychi in range(nchi_to_use):
                         #kldiv1 = sum(Grassberger_KLdiv(chi_counts1, chi_counts2, self.numangles1, self.numangles2), axis=-1)
@@ -1223,7 +1225,8 @@ if __name__ == "__main__":
     parser.add_option("-s", "--sigalpha", default=0.1, type="float", help="p-value threshold for statistical filtering, lower is stricter")
     parser.add_option("-i", "--skip", default = 1, type = "int", help="interval between snapshots to consider, in whatever units of time snapshots were output in")
     parser.add_option("-y", "--abs", default = "no", type = "string", help="take absolute value of kldiv?")
-    parser.add_option("-g", "--grassberger", default = "no", type = "string", help="use Grassberger estimate of pi and pj?")
+    parser.add_option("-u", "--grassberger", default = "no", type = "string", help="use Grassberger estimate of pi and pj?")
+    parser.add_option("-g", "--gcc", default = "gcc", type = "string", help="compiler for inline C code")
     parser.add_option("-z", "--zoom_to_step", default = 0, type = "int", help="skips the first n snapshots in xvg files")
     parser.add_option("-m", "--max_num_chis", default = 99, type = "int", help="max number of sidechain chi angles per residue or ligand")
     parser.add_option("-o", "--bootstrap_set_size", default = None, type = "int", help="perform bootstrapping within this script; value is the size of the subsets to use")
@@ -1232,7 +1235,7 @@ if __name__ == "__main__":
     parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
     parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
     
-
+    mycompiler=options.gcc
     ## SETUP RUN PARAMETERS ##    
     run_params1 = 'None'
     run_params2 = 'None'

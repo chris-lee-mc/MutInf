@@ -10,6 +10,7 @@ from Bio.PDB.PDBParser import PDBParser
 #from scipy import special
 
 global adaptive_partitioning
+global mycompiler = 'gcc' #default compiler for inline C code
 
 def load_two_resfiles(run_params1, run_params2, load_angles=True, all_angle_info=None):
         rp1 = run_params1

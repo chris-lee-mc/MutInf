@@ -7,10 +7,83 @@ from optparse import OptionParser
 from utils import arr2str2, fmt_floats
 from Bio.PDB import PDBIO
 from Bio.PDB.PDBParser import PDBParser
+from multiprocessing import Pool
 #from scipy import special
 
 global adaptive_partitioning
-global mycompiler = 'gcc' #default compiler for inline C code
+global mycompiler 
+
+class Residue_Lite:
+   name = 'XXX'
+   num = 0
+   nchi = 0
+   angles = []
+   rank_order_angles = []
+   angles_complex = [] #for spectral density calculations
+   angles_input = []
+   chi_pop_hist = []
+   chi_var_pop = []
+   bins = []
+   entropy = 0
+   var_ent = 0
+   inv_numangles = []
+   counts = []
+   dKLtot_dchis2 = []
+   max_num_chis = 99
+   chain = ''
+   sequential_res_num = 0
+   # load angle info from xvg files
+   def __str__(self): return "%s %s%s" % (self.name,self.num,self.chain)
+
+   def get_num_chis(self,name):
+    if NumChis.has_key(name): 
+        if name == "SER" or name == "THR" or name == "NSER" or name == "NTHR" or name == "CSER" or name == "CTHR":
+            if(not (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(2)+name+".xvg") or os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(2)+name+".xvg.gz"))): 
+                return min(self.max_num_chis, 1)
+            else: 
+                return min(self.max_num_chis, NumChis[name])
+        else:
+            return min(self.max_num_chis, NumChis[name])
+    else:
+        mychi = 1
+        numchis = 0
+        #while (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+self.num+".xvg")):
+        if(not (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+".xvg") or os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+".xvg.gz"))):
+            while (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+str(self.num)+".xvg") or os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+str(self.num)+".xvg.gz")  ):
+                numchis += 1
+            if numchis == 0:
+                print "cannot find file"+self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+".xvg"
+        else:
+            while (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+".xvg") or os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"chi"+str(numchis+1)+name+".xvg.gz")  ):
+                #quick fix until ligand mc writes residue number as well after their name
+                numchis += 1
+        if(numchis == 0): print "cannot find any xvg files for residue " + str(name) + str(self.num) + "\n"
+        return numchis  
+
+   def has_phipsi(self,name):
+     has_phipsi = False
+     if NumChis.has_key(name): 
+         has_phipsi = True
+     else:
+         if (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"phi"+name+".xvg")):
+            has_phipsi = True
+            if (os.path.exists(self.xvg_basedir+"run1"+self.xvg_chidir+"psi"+name+".xvg")):
+                has_phipsi = True
+            else:
+                has_phipsi = False
+         else:
+            has_phipsi = False
+     return has_phipsi
+
+   def __init__(self,name,num,chain):
+	   self.name = name
+	   self.num = num
+	   try:
+		   self.chain = chain
+	   except:
+		   self.chain = ''
+	   
+
 
 def load_two_resfiles(run_params1, run_params2, load_angles=True, all_angle_info=None):
         rp1 = run_params1
@@ -36,13 +109,13 @@ def load_two_resfiles(run_params1, run_params2, load_angles=True, all_angle_info
                 if matches.group(2) != None:
                     res_chain = matches.group(2)
                 else:
-                    res_chain = " "
+                    res_chain = ""
                 if load_angles: 
                     if(iteration == 0):
-                        minmax1 = ResidueChis(res_name,res_num, xvg_resnum, rp1.xvg_basedir, rp1.num_sims, rp1.num_structs, rp1.xvgorpdb, rp1.binwidth, rp1.sigalpha, rp1.permutations, rp1.phipsi, rp1.backbone_only, rp1.adaptive_partitioning, rp1.which_runs, rp1.pair_runs, bootstrap_choose = rp1.bootstrap_choose, calc_variance=rp1.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp1.xvg_chidir, skip=rp1.skip,skip_over_steps=rp1.skip_over_steps, calc_mutinf_between_sims=rp1.calc_mutinf_between_sims,max_num_chis=rp1.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp1.pdbfile, xtcfile=rp1.xtcfile, output_timeseries=rp1.output_timeseries, bailout_early=True )
+                        minmax1 = ResidueChis(res_name,res_num,res_chain,xvg_resnum, rp1.xvg_basedir, rp1.num_sims, rp1.num_structs, rp1.xvgorpdb, rp1.binwidth, rp1.sigalpha, rp1.permutations, rp1.phipsi, rp1.backbone_only, rp1.adaptive_partitioning, rp1.which_runs, rp1.pair_runs, bootstrap_choose = rp1.bootstrap_choose, calc_variance=rp1.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp1.xvg_chidir, skip=rp1.skip,skip_over_steps=rp1.skip_over_steps, calc_mutinf_between_sims=rp1.calc_mutinf_between_sims,max_num_chis=rp1.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp1.pdbfile, xtcfile=rp1.xtcfile, output_timeseries=rp1.output_timeseries, bailout_early=True )
                         print "min value: "+str(minmax1.minmax[0])
                     else: #this time with min/max supplied
-                        reslist1.append(ResidueChis(res_name,res_num, xvg_resnum, rp1.xvg_basedir, rp1.num_sims, rp1.num_structs, rp1.xvgorpdb, rp1.binwidth, rp1.sigalpha, rp1.permutations, rp1.phipsi, rp1.backbone_only, rp1.adaptive_partitioning, rp1.which_runs, rp1.pair_runs, bootstrap_choose = rp1.bootstrap_choose, calc_variance=rp1.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp1.xvg_chidir, skip=rp1.skip,skip_over_steps=rp1.skip_over_steps, calc_mutinf_between_sims=rp1.calc_mutinf_between_sims,max_num_chis=rp1.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp1.pdbfile, xtcfile=rp1.xtcfile, output_timeseries=rp1.output_timeseries, minmax=minmax1.minmax ))
+                        reslist1.append(ResidueChis(res_name,res_num,res_chain,xvg_resnum, rp1.xvg_basedir, rp1.num_sims, rp1.num_structs, rp1.xvgorpdb, rp1.binwidth, rp1.sigalpha, rp1.permutations, rp1.phipsi, rp1.backbone_only, rp1.adaptive_partitioning, rp1.which_runs, rp1.pair_runs, bootstrap_choose = rp1.bootstrap_choose, calc_variance=rp1.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp1.xvg_chidir, skip=rp1.skip,skip_over_steps=rp1.skip_over_steps, calc_mutinf_between_sims=rp1.calc_mutinf_between_sims,max_num_chis=rp1.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp1.pdbfile, xtcfile=rp1.xtcfile, output_timeseries=rp1.output_timeseries, minmax=minmax1.minmax ))
                         del minmax1
                 if (load_angles != True): 
                     if (iteration == 1):
@@ -55,13 +128,13 @@ def load_two_resfiles(run_params1, run_params2, load_angles=True, all_angle_info
                 if matches.group(2) != None:
                     res_chain = matches.group(2)
                 else:
-                    res_chain = " "
+                    res_chain = ""
                 if load_angles: 
                     if(iteration == 0):
-                        minmax2 = ResidueChis(res_name,res_num, xvg_resnum, rp2.xvg_basedir, rp2.num_sims, rp2.num_structs, rp2.xvgorpdb, rp2.binwidth, rp2.sigalpha, rp2.permutations, rp2.phipsi, rp2.backbone_only, rp2.adaptive_partitioning, rp2.which_runs, rp2.pair_runs, bootstrap_choose = rp2.bootstrap_choose, calc_variance=rp2.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp2.xvg_chidir, skip=rp2.skip,skip_over_steps=rp2.skip_over_steps, calc_mutinf_between_sims=rp2.calc_mutinf_between_sims,max_num_chis=rp2.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp2.pdbfile, xtcfile=rp2.xtcfile, output_timeseries=rp2.output_timeseries, bailout_early = True)
+                        minmax2 = ResidueChis(res_name,res_num,res_chain,xvg_resnum, rp2.xvg_basedir, rp2.num_sims, rp2.num_structs, rp2.xvgorpdb, rp2.binwidth, rp2.sigalpha, rp2.permutations, rp2.phipsi, rp2.backbone_only, rp2.adaptive_partitioning, rp2.which_runs, rp2.pair_runs, bootstrap_choose = rp2.bootstrap_choose, calc_variance=rp2.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp2.xvg_chidir, skip=rp2.skip,skip_over_steps=rp2.skip_over_steps, calc_mutinf_between_sims=rp2.calc_mutinf_between_sims,max_num_chis=rp2.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp2.pdbfile, xtcfile=rp2.xtcfile, output_timeseries=rp2.output_timeseries, bailout_early = True)
                         print "min value: "+str(minmax2.minmax[0])
                     else: #this time with min/max supplied
-                        reslist2.append(ResidueChis(res_name,res_num, xvg_resnum, rp2.xvg_basedir, rp2.num_sims, rp2.num_structs, rp2.xvgorpdb, rp2.binwidth, rp2.sigalpha, rp2.permutations, rp2.phipsi, rp2.backbone_only, rp2.adaptive_partitioning, rp2.which_runs, rp2.pair_runs, bootstrap_choose = rp2.bootstrap_choose, calc_variance=rp2.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp2.xvg_chidir, skip=rp2.skip,skip_over_steps=rp2.skip_over_steps, calc_mutinf_between_sims=rp2.calc_mutinf_between_sims,max_num_chis=rp2.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp2.pdbfile, xtcfile=rp2.xtcfile, output_timeseries=rp2.output_timeseries, minmax=minmax2.minmax ))
+                        reslist2.append(ResidueChis(res_name,res_num,res_chain,xvg_resnum, rp2.xvg_basedir, rp2.num_sims, rp2.num_structs, rp2.xvgorpdb, rp2.binwidth, rp2.sigalpha, rp2.permutations, rp2.phipsi, rp2.backbone_only, rp2.adaptive_partitioning, rp2.which_runs, rp2.pair_runs, bootstrap_choose = rp2.bootstrap_choose, calc_variance=rp2.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp2.xvg_chidir, skip=rp2.skip,skip_over_steps=rp2.skip_over_steps, calc_mutinf_between_sims=rp2.calc_mutinf_between_sims,max_num_chis=rp2.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp2.pdbfile, xtcfile=rp2.xtcfile, output_timeseries=rp2.output_timeseries, minmax=minmax2.minmax ))
                         del minmax2
                 if (load_angles != True): 
                     if (iteration == 1):
@@ -399,10 +472,10 @@ class KLdiv:
             allfile_js_boot = open(prefix+"_all_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
             counter1 = 0 #residue list counter
             for res1, res2 in zip(self.reslist1, self.reslist2):
-                sumfile_kl_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
-                sumfile_js_boot.write(str(res1.name)+str(res1.num)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
-                allfile_kl_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
-                allfile_js_boot.write(str(res1.name)+str(res1.num)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+                sumfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
+                sumfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
+                allfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+                allfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
 		counter1 += 1
             sumfile_kl_boot.close()
             sumfile_js_boot.close()
@@ -420,21 +493,21 @@ class KLdiv:
             #print arr2str2(chi_pop_hist2[:,:], precision=3, length=6)
             #print
             
-            maxfile_kl.write(str(res1.name)+str(res1.num)+" "+str(amax(average(self.kldiv_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
-            sumfile_kl.write(str(res1.name)+str(res1.num)+" "+str(sum(average(self.kldiv_res[counter1,:,:],axis=0)))+"\n")
-            terfile_kl.write(str(res1.name)+str(res1.num)+" "+str((average(self.kldiv_res[counter1,:,-1],axis=0)))+"\n")
-            allfile_kl.write(str(res1.name)+str(res1.num)+" "+fmt_floats(list((average(self.kldiv_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+            maxfile_kl.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(amax(average(self.kldiv_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
+            sumfile_kl.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.kldiv_res[counter1,:,:],axis=0)))+"\n")
+            terfile_kl.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str((average(self.kldiv_res[counter1,:,-1],axis=0)))+"\n")
+            allfile_kl.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.kldiv_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
             
-            maxfile_js.write(str(res1.name)+str(res1.num)+" "+str(amax(average(self.jsdiv_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
-            sumfile_js.write(str(res1.name)+str(res1.num)+" "+str(sum(average(self.jsdiv_res[counter1,:,:],axis=0)))+"\n")
-            terfile_js.write(str(res1.name)+str(res1.num)+" "+str((average(self.jsdiv_res[counter1,:,-1],axis=0)))+"\n")
-            allfile_js.write(str(res1.name)+str(res1.num)+" "+fmt_floats(list((average(self.jsdiv_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+            maxfile_js.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(amax(average(self.jsdiv_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
+            sumfile_js.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.jsdiv_res[counter1,:,:],axis=0)))+"\n")
+            terfile_js.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str((average(self.jsdiv_res[counter1,:,-1],axis=0)))+"\n")
+            allfile_js.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.jsdiv_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
             
             
-            maxfile_chisq.write(str(res1.name)+str(res1.num)+" "+str(amax(average(self.chisq_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
-            sumfile_chisq.write(str(res1.name)+str(res1.num)+" "+str(sum(average(self.chisq_res[counter1,:,:],axis=0)))+"\n")
-            terfile_chisq.write(str(res1.name)+str(res1.num)+" "+str(average(self.chisq_res[counter1,:,-1],axis=0))+"\n")
-            allfile_chisq.write(str(res1.name)+str(res1.num)+" "+fmt_floats(list((average(self.chisq_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+            maxfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(amax(average(self.chisq_res[counter1,:,:],axis=0)))+"\n") #average over boostraps
+            sumfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.chisq_res[counter1,:,:],axis=0)))+"\n")
+            terfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(average(self.chisq_res[counter1,:,-1],axis=0))+"\n")
+            allfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.chisq_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
             counter1 += 1
 
         ### Write Pymol Session Files ####
@@ -912,12 +985,21 @@ class KLdiv:
         self.jsdiv_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # JSdiv for all residues
         self.sigalpha = min(run_params1.sigalpha, run_params2.sigalpha)              # significance value for significance test
         counter = 0
+	newreslist1 = []
+	newreslist2 = []
         for res1, res2 in zip(self.reslist1, self.reslist2):
             #consider refactoring this into a more functional form
             #calculate KLdiv between these two residues... this routine may later include higher-order terms and coord. transforms.
-            (self.kldiv_res[counter,:,:],  self.chisq_res[counter,:,:], self.jsdiv_res[counter,:,:]) = self.__KL_resi_resj__(res1,res2)  
-            counter += 1
-            
+            (self.kldiv_res[counter,:,:],  self.chisq_res[counter,:,:], self.jsdiv_res[counter,:,:]) = self.__KL_resi_resj__(res1,res2)
+	    newreslist1.append(Residue_Lite(res1.name,res1.num,res1.chain)) 
+	    newreslist2.append(Residue_Lite(res2.name,res2.num,res2.chain))
+	    counter += 1
+	#convert residue lists to a "lite" version for further use, to save lots of memory
+	del self.reslist1
+	del self.reslist2
+	self.reslist1 = newreslist1
+	self.reslist2 = newreslist2
+	
         self.kldiv_done = 1 # flag
 
 
@@ -1236,12 +1318,13 @@ if __name__ == "__main__":
     parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
     parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
     
-    mycompiler=options.gcc
+    
     ## SETUP RUN PARAMETERS ##    
     run_params1 = 'None'
     run_params2 = 'None'
     run_params3 = 'None'
     (options,args)=parser.parse_args()
+    mycompiler=options.gcc
     options.adaptive = "no" # KLdiv first order cannot use adaptive partitioning unless dihedrals were ranked ordered for two systems (i.e. residue lists) together
     
     print "COMMANDS: ", " ".join(sys.argv)

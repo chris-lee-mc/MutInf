@@ -49,7 +49,7 @@ while($resline = <STRUCTFILE>)
     if((($tag =~ /ATOM/) || ($tag =~ /HETATM/ )) && $resnum >= 1)
     {
 	print $bfacline;
-	while(!(eof RESBFAC) && !(($bfacline =~ /${resname}${resnum}/) || ($mut_res =~ /${resnum}/))) 
+	while(!(eof RESBFAC) && !(($bfacline =~ /${resname}${resnum}${chn}/) || ($mut_res =~ /${resnum}/))) 
 	{ 
 	    last if(($resname =~ /HIE/) && ($bfacline =~ /HIS${resnum}/));
 	    last if(($resname =~ /HID/) && ($bfacline =~ /HIS${resnum}/));

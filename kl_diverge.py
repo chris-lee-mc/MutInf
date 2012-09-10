@@ -353,8 +353,8 @@ class KLdiv:
         for res1 in self.reslist1:
             test = None
             
-            print "numchain: "+str(res1.num)+ " resname: "+str(res1.name)
-            mymatch = numchain_re.match(str(res1.num))
+            print "numchain: "+str(res1.num)+str(res1.chain)+" resname: "+str(res1.name)
+            mymatch = numchain_re.match(str(res1.num)+str(res1.chain))
             if mymatch != None:
                 (resnum, reschain) = mymatch.groups()
                 print "match: "+str(res1.num)+" "+str(resnum)

@@ -140,7 +140,7 @@ GAMMA_EULER = 0.57721566490153286060651209
 K_NEAREST_NEIGHBOR = 1
 CACHE_TO_DISK = True
 CORRECT_FOR_SYMMETRY = 1
-VERBOSE = 2
+VERBOSE = 1
 OFF_DIAG = 1 #set to "1" to look at off-diagonal terms
 OUTPUT_DIAG = 1  #set to "1" to output flat files for diagonal matrix elements
 EACH_BOOTSTRAP_MATRIX = 1 #set to "1" to output flat files for each bootstrapped matrix
@@ -723,18 +723,30 @@ class AllAngleInfo:
           pdb_num = 0
           for pdb in pdb_traj.get_next_pdb():
               if pdb_num >= self.num_structs: continue
+              
+              if rp.phipsi == -3: #calphas
+                 pdb_phipsiomega = pdb.calc_phi_psi_omega()
+                 self.num_res = pdb_phipsiomega.shape[0]
+                 sim_chis = zeros((self.num_structs, self.num_res,6), float64)
+                 pdb_calpha_coords = pdb.get_ca_xyz_matrix() #nres x 3 matrix
+                 sim_chis[pdb_num, :, 0:2] = pdb_calpha_coords
+                 
+                 if (pdb_num+1) % 100 == 0:
+                     print "Loaded pdb #%d" % (pdb_num), utils.flush()
+               
+              else:
+                 pdb_chis = pdb.calc_chis()
+                 pdb_phipsiomega = pdb.calc_phi_psi_omega()
+                 if (pdb_num+1) % 100 == 0:
+                     print "Loaded pdb #%d" % (pdb_num), utils.flush()
 
-              pdb_chis = pdb.calc_chis()
-              pdb_phipsiomega = pdb.calc_phi_psi_omega()
-              if (pdb_num+1) % 100 == 0:
-                  print "Loaded pdb #%d" % (pdb_num), utils.flush()
-
-              if sim_chis == None:
-                  self.num_res = pdb_chis.shape[0]
-                  sim_chis = zeros((self.num_structs, self.num_res,6), float64)
-              sim_chis[pdb_num, :, 0:2] = pdb_phipsiomega[:,0:2]
-              sim_chis[pdb_num, :, 2:] = pdb_chis
-              #print " shape phipsiomega:"+str(shape(pdb_phipsiomega))+" shape chis: "+str(pdb_chis.shape[0])
+                 if sim_chis == None:
+                     self.num_res = pdb_chis.shape[0]
+                     sim_chis = zeros((self.num_structs, self.num_res,6), float64)
+                 sim_chis[pdb_num, :, 0:2] = pdb_phipsiomega[:,0:2]
+                 sim_chis[pdb_num, :, 2:] = pdb_chis
+                 #print " shape phipsiomega:"+str(shape(pdb_phipsiomega))+" shape chis: "+str(pdb_chis.shape[0])
+              
               pdb_num += 1
           #print "sim chis", sim_chis
 
@@ -1890,7 +1902,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
     Pij[1:,1:]  = (count_matrix[0,permutation,:]).reshape((nbins,nbins)) 
     PiPj[1:,1:] = (ninj_flat[0,permutation,:]).reshape((nbins,nbins)) / (numangles_bootstrap[0] * 1.0)
 
-    if(VERBOSE >= 2):
+    if(VERBOSE >= 1):
         print "First Pass:"
         print "Sum Pij: "+str(sum(Pij[1:,1:]))+" Sum PiPj: "+str(sum(PiPj[1:,1:]))
         print "Marginal Pij, summed over j:\n"
@@ -1906,9 +1918,9 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
 
     #print floor(sum(Pij[1:,1:],axis=1)) == floor(sum(PiPj[1:,1:],axis=1))
     if(VERBOSE >=1):
-           assert(abs(sum(Pij[1:,1:]) - sum(PiPj[1:,1:])) < 0.0001)
-           assert(all(abs(sum(Pij[1:,1:],axis=1) - sum(PiPj[1:,1:],axis=1)) < 0.0001))
-           assert(all(abs(sum(Pij[1:,1:],axis=0) - sum(PiPj[1:,1:],axis=0)) < 0.0001))
+           assert(abs(sum(Pij[1:,1:]) - sum(PiPj[1:,1:])) < nbins)
+           assert(all(abs(sum(Pij[1:,1:],axis=1) - sum(PiPj[1:,1:],axis=1)) < nbins))
+           assert(all(abs(sum(Pij[1:,1:],axis=0) - sum(PiPj[1:,1:],axis=0)) < nbins))
 
     #######################################################################################################
     ## Now for the star terms, if they are present, otherwise set the same as the normal ones
@@ -2096,9 +2108,9 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
         print sum(PiPj[1:,1:],axis=0)
     #print floor(sum(Pij[1:,1:],axis=1)) == floor(sum(PiPj[1:,1:],axis=1))
     if(VERBOSE >= 1):
-           assert(abs(sum(Pij[1:,1:]) - sum(PiPj[1:,1:])) < 0.0001)
-           assert(all(abs(sum(Pij[1:,1:],axis=1) - sum(PiPj[1:,1:],axis=1)) < 0.0001))
-           assert(all(abs(sum(Pij[1:,1:],axis=0) - sum(PiPj[1:,1:],axis=0)) < 0.0001))
+           assert(abs(sum(Pij[1:,1:]) - sum(PiPj[1:,1:])) < nbins)
+           assert(all(abs(sum(Pij[1:,1:],axis=1) - sum(PiPj[1:,1:],axis=1)) < nbins))
+           assert(all(abs(sum(Pij[1:,1:],axis=0) - sum(PiPj[1:,1:],axis=0)) < nbins))
     
     #now sum over bootstraps for 
     Counts_ij = (average(count_matrix[:,mypermutation,:], axis=0)).reshape((nbins,nbins))
@@ -2235,8 +2247,8 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
                           print sum(mycounts_mat,axis=0)
                           print chi_counts1[bootstrap]
                           print chi_counts2[bootstrap]
-                   assert(all(abs(chi_counts1[bootstrap] - sum(mycounts_mat,axis=1)) < 0.00001))
-                   assert(all(abs(chi_counts2[bootstrap] - sum(mycounts_mat,axis=0)) < 0.00001))
+                   assert(all(abs(chi_counts1[bootstrap] - sum(mycounts_mat,axis=1)) < nbins))
+                   assert(all(abs(chi_counts2[bootstrap] - sum(mycounts_mat,axis=0)) < nbins))
 
             #now we need to reshape the marginal counts into a flat "matrix" compatible with count_matrix
             # including counts from the prior
@@ -2416,7 +2428,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
             
         if(VERBOSE >= 2):
                print "Max pvalue             :"+str(pvalue[bootstrap])
-               print "integrate check: "+str(Edgeworth_quantile(integrate.inf,  E_I, Var_I)) #, E_I3, E_I4))
+               #print "integrate check: "+str(Edgeworth_quantile(integrate.inf,  E_I, Var_I)) #, E_I3, E_I4))
         #could use a monte carlo simulation to generate distribution of MI of uniform distribution over adaptive partitioning
         #this would be MI of independent variables
         #for non-Bayesian significance test against null hypothesis of independence
@@ -2838,6 +2850,9 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
        xtc_dist_matrix_cutoff_filter = zeros((bootstrap_sets, num_res, num_res), float64)
        xtc_dist_matrix_cutoff_filter2 = zeros((bootstrap_sets, num_res, num_res), float64)
        xtc_dist_matrix_cutoff_filter3 = zeros((bootstrap_sets, num_res, num_res), float64)
+       xtc_dist_matrix_cutoff_filter4 = zeros((bootstrap_sets, num_res, num_res), float64)
+       xtc_dist_matrix_cutoff_filter5 = zeros((bootstrap_sets, num_res, num_res), float64)
+       xtc_dist_matrix_cutoff_filter6 = zeros((bootstrap_sets, num_res, num_res), float64)
 
        mynumangles = int(min(numangles))
        print "mynumangles: "+str(mynumangles)
@@ -2924,15 +2939,26 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
                            cart2z = *(coords + simnum*num_res*3*max_num_angles + res2*3*max_num_angles + 2*max_num_angles + cartnum);
                            dist2 = (cart2x - cart1x) * (cart2x - cart1x) + (cart2y - cart1y)*(cart2y - cart1y) + (cart2z - cart1z)*(cart2z - cart1z);
                            *(xtc_dist_matrix_snapshots + mybootstrap*bootstrap_choose*mynumangles + mynumangles_sum + cartnum) = sqrt(dist2);
-                           if (dist2 < 8.0*8.0) {
+
+                           if (dist2 < 7.5*7.5) {
                                     *(xtc_dist_matrix_cutoff_filter + mybootstrap*num_res*num_res + res1*num_res + res2) += 1.0;
                            }
-                           if (dist2 < 9.0*9.0) {
+                           if (dist2 < 8.0*8.0) {
                                     *(xtc_dist_matrix_cutoff_filter2 + mybootstrap*num_res*num_res + res1*num_res + res2) += 1.0;
                            }
-                           if (dist2 < 10.0*10.0) {
+                           if (dist2 < 9.0*9.0) {
                                     *(xtc_dist_matrix_cutoff_filter3 + mybootstrap*num_res*num_res + res1*num_res + res2) += 1.0;
                            }
+                           if (dist2 < 10.0*10.0) {
+                                    *(xtc_dist_matrix_cutoff_filter4 + mybootstrap*num_res*num_res + res1*num_res + res2) += 1.0;
+                           }
+                           if (dist2 < 12.0*12.0) {
+                                    *(xtc_dist_matrix_cutoff_filter5 + mybootstrap*num_res*num_res + res1*num_res + res2) += 1.0;
+                           }
+                           if (dist2 < 14.0*14.0) {
+                                    *(xtc_dist_matrix_cutoff_filter6 + mybootstrap*num_res*num_res + res1*num_res + res2) += 1.0;
+                           }
+                           
                            //if(dist2 < 0) {
                            //printf("ERROR: distance less than zero: %f \\n",dist2);
                            //}
@@ -2952,7 +2978,7 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
        for res1 in range(num_res):
               for res2 in range(res1, num_res):
                      #print "res1: "+str(num_res)+" res2: "+str(num_res)
-                     weave.inline(code, ['num_sims', 'max_num_angles','numangles_bootstrap', 'num_res', 'which_runs', 'coords', 'xtc_dist_squared_matrix','xtc_dist_matrix','xtc_dist_variance_matrix','bootstrap_choose','bootstrap_sets','xtc_dist_squared_matrix_dev_sum','xtc_dist_squared_matrix_compensation','xtc_dist_matrix_accumulator','xtc_dist_squared_matrix_accumulator','xtc_dist_matrix_snapshots','xtc_dist_matrix_cutoff_filter','res1','res2','mynumangles', 'xtc_dist_matrix_cutoff_filter2', 'xtc_dist_matrix_cutoff_filter3' ],                extra_compile_args =['  -fopenmp'],
+                     weave.inline(code, ['num_sims', 'max_num_angles','numangles_bootstrap', 'num_res', 'which_runs', 'coords', 'xtc_dist_squared_matrix','xtc_dist_matrix','xtc_dist_variance_matrix','bootstrap_choose','bootstrap_sets','xtc_dist_squared_matrix_dev_sum','xtc_dist_squared_matrix_compensation','xtc_dist_matrix_accumulator','xtc_dist_squared_matrix_accumulator','xtc_dist_matrix_snapshots','xtc_dist_matrix_cutoff_filter','res1','res2','mynumangles', 'xtc_dist_matrix_cutoff_filter2', 'xtc_dist_matrix_cutoff_filter3', 'xtc_dist_matrix_cutoff_filter4', 'xtc_dist_matrix_cutoff_filter5' , 'xtc_dist_matrix_cutoff_filter6'  ],                extra_compile_args =['  -fopenmp'],
                      extra_link_args=['-lgomp'],
                      compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"])
                      #,type_converters = converters.blitz)
@@ -2969,10 +2995,17 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
                      xtc_dist_matrix_cutoff_filter[:,res2,res1] = xtc_dist_matrix_cutoff_filter[:,res1,res2]
                      xtc_dist_matrix_cutoff_filter2[:,res2,res1] = xtc_dist_matrix_cutoff_filter2[:,res1,res2]
                      xtc_dist_matrix_cutoff_filter3[:,res2,res1] = xtc_dist_matrix_cutoff_filter3[:,res1,res2]
+                     xtc_dist_matrix_cutoff_filter4[:,res2,res1] = xtc_dist_matrix_cutoff_filter4[:,res1,res2]
+                     xtc_dist_matrix_cutoff_filter5[:,res2,res1] = xtc_dist_matrix_cutoff_filter5[:,res1,res2]
+                     xtc_dist_matrix_cutoff_filter6[:,res2,res1] = xtc_dist_matrix_cutoff_filter6[:,res1,res2]
 
        xtc_dist_matrix_cutoff_filter_avg = average( xtc_dist_matrix_cutoff_filter, axis=0)
        xtc_dist_matrix_cutoff_filter_avg2 = average( xtc_dist_matrix_cutoff_filter2, axis=0)
        xtc_dist_matrix_cutoff_filter_avg3 = average( xtc_dist_matrix_cutoff_filter3, axis=0)
+       xtc_dist_matrix_cutoff_filter_avg4 = average( xtc_dist_matrix_cutoff_filter4, axis=0)
+       xtc_dist_matrix_cutoff_filter_avg5 = average( xtc_dist_matrix_cutoff_filter5, axis=0)
+       xtc_dist_matrix_cutoff_filter_avg6 = average( xtc_dist_matrix_cutoff_filter6, axis=0)
+
        for res1 in range(num_res):
               for res2 in range(res1, num_res):
                      if(xtc_dist_matrix_cutoff_filter_avg[res1,res2] < 0.75 * mynumangles_sum):
@@ -2995,6 +3028,27 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
                      else:
                             xtc_dist_matrix_cutoff_filter_avg3[res1,res2] = 1.0
                             xtc_dist_matrix_cutoff_filter_avg3[res2,res1] = 1.0
+
+                     if(xtc_dist_matrix_cutoff_filter_avg4[res1,res2] < 0.75 * mynumangles_sum):
+                            xtc_dist_matrix_cutoff_filter_avg4[res1,res2] = 0
+                            xtc_dist_matrix_cutoff_filter_avg4[res2,res1] = 0
+                     else:
+                            xtc_dist_matrix_cutoff_filter_avg4[res1,res2] = 1.0
+                            xtc_dist_matrix_cutoff_filter_avg4[res2,res1] = 1.0
+
+                     if(xtc_dist_matrix_cutoff_filter_avg5[res1,res2] < 0.75 * mynumangles_sum):
+                            xtc_dist_matrix_cutoff_filter_avg5[res1,res2] = 0
+                            xtc_dist_matrix_cutoff_filter_avg5[res2,res1] = 0
+                     else:
+                            xtc_dist_matrix_cutoff_filter_avg5[res1,res2] = 1.0
+                            xtc_dist_matrix_cutoff_filter_avg5[res2,res1] = 1.0
+                     
+                     if(xtc_dist_matrix_cutoff_filter_avg6[res1,res2] < 0.75 * mynumangles_sum):
+                            xtc_dist_matrix_cutoff_filter_avg6[res1,res2] = 0
+                            xtc_dist_matrix_cutoff_filter_avg6[res2,res1] = 0
+                     else:
+                            xtc_dist_matrix_cutoff_filter_avg6[res1,res2] = 1.0
+                            xtc_dist_matrix_cutoff_filter_avg6[res2,res1] = 1.0
                      
                      
 
@@ -3055,9 +3109,12 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
        output_matrix(prefix+"_bootstrap_avg_dist_variance_matrix_0diag.txt",            average_dist_variance_matrix ,name_num_list,name_num_list,zero_diag=True)
        #output_matrix(prefix+"_bootstrap_avg_dist_stdev_matrix.txt",            sqrt(average_dist_variance_matrix) ,name_num_list,name_num_list)
        #output_matrix(prefix+"_bootstrap_avg_dist_stdev_matrix_0diag.txt",            sqrt(average_dist_variance_matrix) ,name_num_list,name_num_list)
-       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_8.0.txt", xtc_dist_matrix_cutoff_filter_avg, name_num_list, name_num_list, zero_diag=True)
-       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_9.0.txt", xtc_dist_matrix_cutoff_filter_avg2, name_num_list, name_num_list, zero_diag=True)
-       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_10.0.txt", xtc_dist_matrix_cutoff_filter_avg3, name_num_list, name_num_list, zero_diag=True)
+       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_7.5.txt", xtc_dist_matrix_cutoff_filter_avg, name_num_list, name_num_list, zero_diag=True)
+       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_8.0.txt", xtc_dist_matrix_cutoff_filter_avg2, name_num_list, name_num_list, zero_diag=True)
+       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_9.0.txt", xtc_dist_matrix_cutoff_filter_avg3, name_num_list, name_num_list, zero_diag=True)
+       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_10.0.txt", xtc_dist_matrix_cutoff_filter_avg4, name_num_list, name_num_list, zero_diag=True)
+       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_12.0.txt", xtc_dist_matrix_cutoff_filter_avg5, name_num_list, name_num_list, zero_diag=True)
+       output_matrix(prefix+"_bootstrap_avg_dist_contacts_cutoff_filter_14.0.txt", xtc_dist_matrix_cutoff_filter_avg6, name_num_list, name_num_list, zero_diag=True)
 
        return
 
@@ -5619,6 +5676,13 @@ if __name__ == "__main__":
     adaptive_partitioning = (options.adaptive == "yes")
     phipsi = 0
     backbone_only = 0
+    if options.backbone == "calpha":
+           if options.traj_fns != None:
+                  phipsi = -3
+                  backbone_only = 1
+           else:
+                  options.backbone = "phipsi"
+    
     if options.backbone == "phipsichi":
         phipsi = 2;
         backbone_only =0
@@ -5634,6 +5698,7 @@ if __name__ == "__main__":
         print "treating backbone and sidechain separately according to residue list"
         phipsi = -2
         backbone_only = 0
+
     #phipsi = options.backbone.find("phipsi")!=-1
     #backbone_only = options.backbone.find("chi")==-1
     bins=arange(-180,180,options.binwidth) #Compute bin edges

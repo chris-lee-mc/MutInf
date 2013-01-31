@@ -138,9 +138,9 @@ TWOPI = 2 * PI
 ROOTPI = 1.772453850905516027298167483341
 GAMMA_EULER = 0.57721566490153286060651209
 K_NEAREST_NEIGHBOR = 1
-CACHE_TO_DISK = True
+CACHE_TO_DISK = False
 CORRECT_FOR_SYMMETRY = 1
-VERBOSE = 1
+VERBOSE = 2
 OFF_DIAG = 1 #set to "1" to look at off-diagonal terms
 OUTPUT_DIAG = 1  #set to "1" to output flat files for diagonal matrix elements
 EACH_BOOTSTRAP_MATRIX = 1 #set to "1" to output flat files for each bootstrapped matrix
@@ -698,7 +698,7 @@ class AllAngleInfo:
       self.num_sims, self.num_structs, self.num_res = rp.num_sims, rp.num_structs, rp.num_res
       self.calc_variance = False
    # load dihedrals from a pdb trajectory
-   def load_angles_from_traj(self, sequential_sim_num, pdb_traj, cache_to_disk=True):
+   def load_angles_from_traj(self, sequential_sim_num, pdb_traj, run_params, cache_to_disk=True):
       sim_chis, found_in_cache = None, False
 
       # check if the simulations is cached
@@ -724,13 +724,15 @@ class AllAngleInfo:
           for pdb in pdb_traj.get_next_pdb():
               if pdb_num >= self.num_structs: continue
               
-              if rp.phipsi == -3: #calphas
+              if run_params.phipsi == -3: #calphas
                  pdb_phipsiomega = pdb.calc_phi_psi_omega()
                  self.num_res = pdb_phipsiomega.shape[0]
-                 sim_chis = zeros((self.num_structs, self.num_res,6), float64)
+                 if sim_chis == None:
+                        sim_chis = zeros((self.num_structs, self.num_res,6), float64)
                  pdb_calpha_coords = pdb.get_ca_xyz_matrix() #nres x 3 matrix
-                 sim_chis[pdb_num, :, 0:2] = pdb_calpha_coords
-                 
+                 sim_chis[pdb_num, :, :3] = pdb_calpha_coords[:,:]
+                 #print "pdb calpha coords: "+str(pdb_num)
+                 #print pdb_calpha_coords
                  if (pdb_num+1) % 100 == 0:
                      print "Loaded pdb #%d" % (pdb_num), utils.flush()
                
@@ -748,7 +750,7 @@ class AllAngleInfo:
                  #print " shape phipsiomega:"+str(shape(pdb_phipsiomega))+" shape chis: "+str(pdb_chis.shape[0])
               
               pdb_num += 1
-          #print "sim chis", sim_chis
+          print "sim chis", sim_chis
 
       # Store the angle data into the cache
       if cache_to_disk and not found_in_cache:
@@ -756,14 +758,17 @@ class AllAngleInfo:
           cache[key] = [self.num_res, sim_chis]
           cache.close()
 
-      if self.all_chis == None:
-          self.all_chis = zeros((self.num_sims, self.num_structs, self.num_res,6), float64)
+      if self.all_chis == None:  
+          self.all_chis = zeros((self.num_sims, self.num_structs , self.num_res,6), float64)
       self.all_chis[sequential_sim_num, :, : , :] = sim_chis[:, :, :]
+      print "all chis:"
+      print self.all_chis
 
    def get_angles(self, sequential_sim_num, sequential_res_num, res_name, backbone_only, phipsi, max_num_chis):
        chi_nums = []
        if phipsi == 2: chi_nums += [0,1] # which angles to use
        if backbone_only == 0: chi_nums += range(2, min(max_num_chis,NumChis[res_name]) + 2)
+       if phipsi == -3: chi_nums += [0,1,2] #C-alpha x,y,z
        #print chi_nums
        #print self.all_chis
 
@@ -3709,6 +3714,8 @@ class ResidueChis:
                          #shifted_carts[i,j,:] = shifted_carts[i,j,:] + min(shifted_carts[i,j,:])
        
        self.angles = shifted_carts[:,:,:]
+       if VERBOSE > 1:
+              print shifted_carts
        self.numangles_bootstrap[:] = min(self.numangles) * bootstrap_choose
        print "done with correcting and shifting cartesians"
        del shifted_carts
@@ -3991,7 +3998,8 @@ class ResidueChis:
                     self.nchi =  self.get_num_chis(myname)
              else:
                     self.nchi = 2 * self.has_phipsi(myname)
-             
+      elif(phipsi == -3):
+             self.nchi = 3 #C-alpha x, y, z
       else:             #coarse discretize phi/psi into 4 bins: alpha, beta, turn, other
              self.nchi = self.get_num_chis(myname) * (1 - backbone_only) + 1 * self.has_phipsi(myname)
              coarse_discretize = 1
@@ -4125,9 +4133,9 @@ class ResidueChis:
 
       self.sorted_angles = zeros((self.nchi, sum(self.numangles)),float64)
       
-      if(xvgorpdb == "xvg" or xvgorpdb == "pdb"):
+      if(xvgorpdb == "xvg" or (xvgorpdb == "pdb" and phipsi != -3)): #if not using C-alphas from pdb
              self.correct_and_shift_angles(num_sims,bootstrap_sets,bootstrap_choose, coarse_discretize)
-      elif(xvgorpdb == "xtc"):
+      elif(xvgorpdb == "xtc" or (xvgorpdb == "pdb" and phipsi == -3)): #if using xtc cartesians or pdb C-alphas
              self.correct_and_shift_carts(num_sims,bootstrap_sets,bootstrap_choose)
              
       if(minmax == None):
@@ -4311,7 +4319,9 @@ class ResidueChis:
       
 
       
-      if VERBOSE >= 2: print "Angles: ", map(int, list(self.angles[0,0,0:self.numangles[0]])), "\n\n"
+      if VERBOSE >= 2: 
+             print "Angles: ", map(int, list(self.angles[0,0,0:self.numangles[0]])), "\n\n"
+             print self.angles
       assert( all( self.angles >= 0))
       assert( all( self.angles <= 360))
       
@@ -5485,7 +5495,7 @@ def load_data(run_params):
        all_angle_info = AllAngleInfo(run_params)
        runs_to_load = set(array(run_params.which_runs).flatten())
        for sequential_sim_num, true_sim_num in zip(range(len(runs_to_load)), runs_to_load):
-          all_angle_info.load_angles_from_traj(sequential_sim_num, trajs[true_sim_num-1], CACHE_TO_DISK)
+          all_angle_info.load_angles_from_traj(sequential_sim_num, trajs[true_sim_num-1], run_params, CACHE_TO_DISK)
        print "Shape of all angle matrix: ", all_angle_info.all_chis.shape
 
     print run_params
@@ -5676,7 +5686,7 @@ if __name__ == "__main__":
     adaptive_partitioning = (options.adaptive == "yes")
     phipsi = 0
     backbone_only = 0
-    if options.backbone == "calpha":
+    if options.backbone == "calpha" or options.backbone == "calphas":
            if options.traj_fns != None:
                   phipsi = -3
                   backbone_only = 1
@@ -5918,8 +5928,8 @@ if __name__ == "__main__":
                 for m in range(mut_info_res_matrix.shape[4]):
                     if(sum(mut_info_res_matrix[:,i,j,k,m]) > 0):
                         mutinf_boots = mut_info_res_matrix[:,i,j,k,m].copy()
-                        print "mutinf boots avg:"
-                        print average(mutinf_boots[mutinf_boots > 0], axis=0)
+                        #print "mutinf boots avg:"
+                        #print average(mutinf_boots[mutinf_boots > 0], axis=0)
                         mutinf_boots[mutinf_boots < 0] = 0 #use negative and zero values for significance testing but not in the average
                         #zero values of mutinf_boots will include those zeroed out in the permutation test
                         mutinf = mut_info_res_matrix_avg[i,j,k,m] = average(mutinf_boots[mutinf_boots > 0 ],axis=0) 

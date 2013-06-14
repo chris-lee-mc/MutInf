@@ -1709,7 +1709,7 @@ def calc_ind_mutinf_from_transition_matrix(chi_counts1, chi_counts2, bins1, bins
 
    
         
-def calc_mutinf_multinomial_constrained( nbins, counts1, counts2, adaptive_partitioning ):
+def calc_mutinf_multinomial_constrained( nbins, counts1, counts2, adaptive_partitioning, bootstraps = None ):
     
     # allocate the matrices the first time only for speed
     
@@ -1732,7 +1732,10 @@ def calc_mutinf_multinomial_constrained( nbins, counts1, counts2, adaptive_parti
     print counts1[0,:]
     
     #numangles_bootstrap = ones((bootstrap_sets),int32) * sum(counts1[0,:])  #make a local version of this variable
-    bootstrap_sets = (shape(counts1))[0] #infer bootstrap sets from counts
+    if(bootstraps == None):
+           bootstrap_sets = (shape(counts1))[0] #infer bootstrap sets from counts
+    else:
+           bootstrap_sets = bootstraps
     numangles_bootstrap = sum(counts1[:,:], axis=1) 
 
     ref_counts1 = zeros((bootstrap_sets, nbins),int32)
@@ -3093,7 +3096,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
     if(permutations == 0):
         if(mutinf_multinomial_sequential == None or adaptive_partitioning == 0):
             E_I_multinomial_sequential, Var_I_multinomial_sequential, E_I3_multinomial_sequential, E_I4_multinomial_sequential, Var_I_runs_multinomial_sequential, mutinf_multinomial_sequential, var_mutinf_multinomial_sequential = \
-                                        calc_mutinf_multinomial_constrained(nbins_cor,chi_counts_sequential1.copy(),chi_counts_sequential2.copy(),adaptive_partitioning )
+                                        calc_mutinf_multinomial_constrained(nbins_cor,chi_counts_sequential1.copy(),chi_counts_sequential2.copy(),adaptive_partitioning, bootstraps = bootstrap_sets )
             if VERBOSE >= 2:
                    print "shape of mutinf_multinomial_sequential: "+str(shape(mutinf_multinomial_sequential))
     else:

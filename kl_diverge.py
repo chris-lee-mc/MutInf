@@ -8,6 +8,8 @@ from utils import arr2str2, fmt_floats
 from Bio.PDB import PDBIO
 from Bio.PDB.PDBParser import PDBParser
 from multiprocessing import Pool
+import os
+
 #from scipy import special
 
 global adaptive_partitioning
@@ -219,7 +221,7 @@ def Grassberger_KLdiv(nj, ni, numangles1, numangles2):
 
 
 
-def filter_div(div_ref, div_ref2, div1):
+def filter_div(div_ref, div_ref2, div1, correct="yes"):
     #  If the "target" ensemble is the same as the equilibrium ensemble, this quantity will be zero. However, this is not often the case due to sample variability. Furthermore, if applied naively, it might be difficult to extract meaningful population shifts due to different simulation conditions versus artefactual popualtion shifts due to sample variability. In order to improve the signal-to-noise ratio in our calculation the Kullback-Leibler Divergence and thereby capture meaningful differences between conformational ensembles, we will calculate the K-L Divergence expected from sample variability in the "reference" ensemble and use it for a significance test and to correct the calculated values.
     
     
@@ -247,30 +249,38 @@ def filter_div(div_ref, div_ref2, div1):
             kldiv_null_hyp_ref = average(div_ref.kldiv_res[counter,:,mychi]) #average over bootstraps
             kldiv_num_greater_than_ref = len(kldiv_refs[kldiv_refs > kldiv_target_avg]) #how many of ref sub-ensembles have a KLdiv wrt full ref ensemble greater than the KLdiv of the target
             bootstrap_sets = div1.bootstrap_sets
+
             jsdiv_target_avg = average(div1.jsdiv_res[counter,:,mychi])
             jsdiv_refs  = div_ref.jsdiv_res[counter,:,mychi]
             jsdiv_refs2 = div_ref2.jsdiv_res[counter,:,mychi]
             jsdiv_targs = div1.jsdiv_res[counter,:,mychi]
             jsdiv_null_hyp_ref = (average(div_ref.jsdiv_res[counter,:,mychi]) + average(div_ref2.jsdiv_res[counter,:,mychi])) / 2.0 #average over bootstraps
             jsdiv_num_greater_than_ref = len(jsdiv_refs[jsdiv_refs > jsdiv_target_avg]) + len(jsdiv_refs[jsdiv_refs2 > jsdiv_target_avg]) #how many of sub-ensembles of reference or sub-ensembles of target  have a JSdiv greater than the avg JSdiv between ref and target
+
+            dS_refs = div_ref.ent2_res[counter,:,mychi] - div_ref.ent1_res[counter,:,mychi] 
+            dS_targs = div1.ent2_res[counter,:,mychi] - div1.ent1_res[counter,:,mychi]
+            dS_target_avg = average(div1.ent2_res[counter,:,mychi] - div1.ent1_res[counter,:,mychi])
+            dS_num_greater_than_ref =  len(dS_refs[abs(dS_refs) > abs(dS_target_avg) ])
             
-            #filter
+
+            #filter KLdiv
             print "KLdiv avg total: "+str(kldiv_target_avg)
             print "KLdiv null hyp:  "+str(kldiv_null_hyp_ref)
             print "kldiv null hyp samples > target: "+str(kldiv_num_greater_than_ref)
             print "KLdiv corrected: "+str(div1.kldiv_res[counter,:,mychi]) + " bias: "+str( kldiv_null_hyp_ref)
-            if(kldiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
+            if(kldiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha or kldiv_targs <= 0.0):
                 div1.kldiv_res[counter,:,mychi] = 0 #zero all bootstrap_sets if it is filtered out. Hope variance is zero-safe
                 print "this torsion's KL divergence was not significant."
             else:
                 #remove bias due to kldiv of reference with respect to itself
                 print "significant KL divergence: correcting for bias."
-                kldiv_targs -= kldiv_null_hyp_ref  
+                if(correct == "yes"):
+                   kldiv_targs -= kldiv_null_hyp_ref  
                 kldiv_targs[kldiv_targs < 0] = 0
                 div1.kldiv_res[counter,:,mychi] = kldiv_targs 
             print 
-                
-            #filter
+                 
+            #filter JSdiv
             print "JSdiv avg total: "+str(jsdiv_target_avg)
             print "JSdiv null hyp:  "+str(jsdiv_null_hyp_ref)
             print "jsdiv null hyp samples > target: "+str(jsdiv_num_greater_than_ref)
@@ -281,10 +291,27 @@ def filter_div(div_ref, div_ref2, div1):
             else:
                 #remove bias due to kldiv of reference with respect to itself
                 print "significant JS divergence."
-                jsdiv_targs -= jsdiv_null_hyp_ref  
+                if(correct == "yes"):
+                   jsdiv_targs -= jsdiv_null_hyp_ref  
                 jsdiv_targs[jsdiv_targs < 0] = 0
                 div1.jsdiv_res[counter,:,mychi] = jsdiv_targs 
             print
+
+            #filter deltaS
+            print "deltS avg total: "+str(dS_target_avg)
+            #print "deltS null hyp:  "+str(kldiv_null_hyp_ref)
+            print "deltS null hyp samples > target: "+str(dS_num_greater_than_ref)
+            #print "deltS corrected: "+str(div1.kldiv_res[counter,:,mychi]) + " bias: "+str( kldiv_null_hyp_ref) #assume no bias here since entropy changes can go up or down
+            if(kldiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
+                div1.dS_res[counter,:,mychi] = 0 #zero all bootstrap_sets if it is filtered out. Hope variance is zero-safe
+                print "this torsion's KL divergence was not significant."
+            else:
+                #remove bias due to kldiv of reference with respect to itself
+                print "significant deltaS "
+                #kldiv_targs -= kldiv_null_hyp_ref  
+                #kldiv_targs[kldiv_targs < 0] = 0
+                #div1.kldiv_res[counter,:,mychi] = kldiv_targs 
+            print 
        counter += 1 
 
 
@@ -405,11 +432,21 @@ class KLdiv:
         prefix=str(self.run_params1.resfile_fn)+str(self.run_params2.resfile_fn)
         kl_pdbfile = prefix + "_kldiv" + postfix + ".pdb"
         js_pdbfile = prefix + "_jsdiv" + postfix + ".pdb"
+        ent1_pdbfile = prefix + "_ent_ref" + postfix + ".pdb"
+        ent2_pdbfile = prefix + "_ent_targ" + postfix + ".pdb"
+        dS_pdbfile = prefix + "_ent_delta" + postfix + ".pdb"
         try:
             structure_kl = parser.get_structure('self1', PDB_input)
-            self.replace_bfac_res(self.kldiv_res, structure_kl, kl_pdbfile)
+            self.replace_bfac_res(self.kldiv_res * 50, structure_kl, kl_pdbfile)
             structure_js = parser.get_structure('self2', PDB_input)
-            self.replace_bfac_res(self.jsdiv_res, structure_js, js_pdbfile)
+            self.replace_bfac_res(self.jsdiv_res * 50, structure_js, js_pdbfile)
+            structure_ent1 = parser.get_structure('self3', PDB_input)
+            self.replace_bfac_res(self.ent1_res, structure_ent1, ent1_pdbfile)
+            structure_ent2 = parser.get_structure('self4', PDB_input)
+            self.replace_bfac_res(self.ent2_res, structure_ent2, ent2_pdbfile)
+            structure_dS = parser.get_structure('self5', PDB_input)
+            self.replace_bfac_res(self.dS_res, structure_dS, dS_pdbfile)
+            
         except:
             print "Sorry, BioPython didn't like your pdb most likely, you will have to use replace_res_bfac_mut.pl to replace the b-factors in the pdb for this case\n"
 
@@ -460,8 +497,17 @@ class KLdiv:
         sumfile_js = open(prefix+"_sum_jsdiv.txt",'w')
         terfile_js = open(prefix+"_ter_jsdiv.txt",'w')
         allfile_js = open(prefix+"_all_jsdiv.txt",'w')
+        sumfile_ent1 = open(prefix+"_sum_ent_ref.txt",'w')
+        allfile_ent1 = open(prefix+"_all_ent_ref.txt",'w')
+        sumfile_ent2 = open(prefix+"_sum_ent_targ.txt",'w')
+        allfile_ent2 = open(prefix+"_all_ent_targ.txt",'w')
+        sumfile_dS = open(prefix+"_sum_ent_delta.txt",'w')
+        allfile_dS = open(prefix+"_all_ent_delta.txt",'w')
         pymolfile_kl = open(prefix+"_kldiv.pml",'w')
         pymolfile_js = open(prefix+"_jsdiv.pml",'w')
+        pymolfile_ent1 = open(prefix+"_ent_ref.pml",'w')
+        pymolfile_ent2 = open(prefix+"_ent_targ.pml",'w')
+        pymolfile_dS = open(prefix+"_ent_delta.pml",'w')
         PDB_input = self.run_params1.pdbfile
         # first, output data for each bootstrap separately
         bootstraps = self.bootstrap_sets
@@ -470,12 +516,27 @@ class KLdiv:
             allfile_kl_boot = open(prefix+"_all_kldiv_bootstrap"+str(mybootstrap)+".txt",'w')
             sumfile_js_boot = open(prefix+"_sum_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
             allfile_js_boot = open(prefix+"_all_jsdiv_bootstrap"+str(mybootstrap)+".txt",'w')
+            allfile_ent1_boot = open(prefix+"_all_ent_ref_bootstrap"+str(mybootstrap)+".txt",'w')
+            allfile_ent2_boot = open(prefix+"_all_ent_targ_bootstrap"+str(mybootstrap)+".txt",'w')
+            sumfile_ent1_boot =  open(prefix+"_sum_ent_ref_bootstrap"+str(mybootstrap)+".txt",'w')
+            sumfile_ent2_boot =  open(prefix+"_sum_ent_targ_bootstrap"+str(mybootstrap)+".txt",'w')
+            allfile_dS_boot = open(prefix+"_all_ent_delta_bootstrap"+str(mybootstrap)+".txt",'w')
+            sumfile_dS_boot = open(prefix+"_sum_ent_delta_bootstrap"+str(mybootstrap)+".txt",'w')
             counter1 = 0 #residue list counter
             for res1, res2 in zip(self.reslist1, self.reslist2):
                 sumfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
                 sumfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
                 allfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
                 allfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+                sumfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
+                allfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+
+                sumfile_ent1_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.ent1_res[counter1,mybootstrap,:]))+"\n")
+                sumfile_ent2_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.ent1_res[counter1,mybootstrap,:]))+"\n")
+                sumfile_dS_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.dS_res[counter1,mybootstrap,:] ))+"\n")
+                allfile_ent1_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.ent1_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+                allfile_ent2_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.ent2_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n") 
+                allfile_dS_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.dS_res[counter1,mybootstrap,:] ).flatten()), digits=6, length=9)+"\n") 
 		counter1 += 1
             sumfile_kl_boot.close()
             sumfile_js_boot.close()
@@ -508,6 +569,17 @@ class KLdiv:
             sumfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.chisq_res[counter1,:,:],axis=0)))+"\n")
             terfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(average(self.chisq_res[counter1,:,-1],axis=0))+"\n")
             allfile_chisq.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.chisq_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+
+            sumfile_ent1.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.ent1_res[counter1,:,:],axis=0)))+"\n")
+            allfile_ent1.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.ent1_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+
+            sumfile_ent2.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.ent2_res[counter1,:,:],axis=0)))+"\n")
+            allfile_ent2.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.ent2_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+
+            sumfile_dS.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.dS_res[counter1,mybootstrap,:], axis=0)))+"\n")
+            allfile_dS.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.dS_res[counter1,mybootstrap,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+                           
+
             counter1 += 1
 
         ### Write Pymol Session Files ####
@@ -517,6 +589,9 @@ class KLdiv:
         prefix=str(self.run_params1.resfile_fn)+str(self.run_params2.resfile_fn)
         kl_pdbfile = prefix + "_kldiv" + postfix + ".pdb"
         js_pdbfile = prefix + "_jsdiv" + postfix + ".pdb"
+        ent1_pdbfile = prefix + "_ent_ref" + postfix + ".pdb"
+        ent2_pdbfile = prefix + "_ent_targ" + postfix + ".pdb"
+        dS_pdbfile = prefix + "_ent_delta" + postfix + ".pdb"
         
         pymolfile_kl.write("from pymol import cmd"+"\n")
         pymolfile_kl.write("load "+str(kl_pdbfile)+", system \n")
@@ -528,11 +603,41 @@ class KLdiv:
         
         pymolfile_js.write("from pymol import cmd"+"\n")
         pymolfile_js.write("load "+str(js_pdbfile)+", system \n")
-        pymolfile_js.write("preset.b_factor_putty('system'),_self=cmd"+"\n")
+        pymolfile_js.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
         pymolfile_js.write("sele b0, b < 0.00001"+"\n")
         pymolfile_js.write("cmd.color(5278, 'b0')"+"\n")
         pymolfile_js.write("cmd.disable('b0')"+"\n")
         pymolfile_js.write("cmd.bg_color('white')"+"\n")
+
+        pymolfile_ent1.write("from pymol import cmd"+"\n")
+        pymolfile_ent1.write("load "+str(ent1_pdbfile)+", system \n")
+        pymolfile_ent1.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
+        pymolfile_ent1.write("sele b0, b < 0.00001"+"\n")
+        pymolfile_ent1.write("cmd.color(5278, 'b0')"+"\n")
+        pymolfile_ent1.write("cmd.disable('b0')"+"\n")
+        pymolfile_ent1.write("cmd.bg_color('white')"+"\n")
+
+        pymolfile_ent2.write("from pymol import cmd"+"\n")
+        pymolfile_ent2.write("load "+str(ent2_pdbfile)+", system \n")
+        pymolfile_ent2.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
+        pymolfile_ent2.write("sele b0, b < 0.00001"+"\n")
+        pymolfile_ent2.write("cmd.color(5278, 'b0')"+"\n")
+        pymolfile_ent2.write("cmd.disable('b0')"+"\n")
+        pymolfile_ent2.write("cmd.bg_color('white')"+"\n")
+
+
+        ### add Robert L. Campbell's function to modify the color bar 
+        MutInf_Path = os.path.dirname(os.path.abspath(__file__))
+        pymolfile_dS.write("run "+str(MutInf_Path)+"/color_b.py \n")
+        #pymolfile_dS.write("from pymol import cmd"+"\n")
+        pymolfile_dS.write("load "+str(dS_pdbfile)+", system \n")
+        pymolfile_dS.write("preset.pretty('system')"+"\n")  #,_self=cmd"+"\n")
+        pymolfile_dS.write("color_b(selection='b<0',gradient='bw',mode='hist')\n")
+        pymolfile_dS.write("color_b(selection='b>0',gradient='wr',mode='hist')\n")
+        pymolfile_dS.write("sele b0, b < 0.00001 and b > -0.00001 "+"\n")
+        pymolfile_dS.write("cmd.color(5278, 'b0')"+"\n")
+        pymolfile_dS.write("cmd.disable('b0')"+"\n")
+        pymolfile_dS.write("cmd.bg_color('white')"+"\n")
 
         maxfile_kl.close()
         sumfile_kl.close()
@@ -548,7 +653,10 @@ class KLdiv:
         allfile_chisq.close()
 	pymolfile_kl.close()
 	pymolfile_js.close()
-    
+        pymolfile_ent1.close()
+        pymolfile_ent2.close()
+        pymolfile_dS.close()
+
     #########################################################################################################################################
     ### _KL_innerloop_calc_ : For two vectors of pdf's (maximum 6 dimensions), calculates 1st-order KLdiv, JSdiv, Chi-Squared  
     #########################################################################################################################################
@@ -559,6 +667,13 @@ class KLdiv:
                 jsdiv2 = zeros((6),float64)
                 kldiv4 = zeros((6),float64)
                 jsdiv4 = zeros((6),float64)
+                ent1   = zeros((6),float64)
+                ent2   = zeros((6),float64)
+                ### Histogram entropy, the "Shannon" part
+                for mychi in range(nchi_to_use):
+                   ent1[mychi] = sum((chi_counts1[mychi,:] * 1.0 / self.numangles1) * (log(self.numangles1) - special.psi(chi_counts1[mychi,:] + SMALL) - ((-1) ** (chi_counts1[mychi,:] % 2)) / (chi_counts1[mychi,:] + 1.0)),axis=-1) 
+                   ent2[mychi] = sum((chi_counts2[mychi,:] * 1.0 / self.numangles2) * (log(self.numangles2) - special.psi(chi_counts2[mychi,:] + SMALL) - ((-1) ** (chi_counts2[mychi,:] % 2)) / (chi_counts2[mychi,:] + 1.0)),axis=-1) 
+                ###
                 if(self.run_params1.options.grassberger == "no" and self.run_params1.options.abs == "no"):
                     for mychi in range(nchi_to_use):
                         try:
@@ -579,7 +694,7 @@ class KLdiv:
                         #Jensen-Shannon Divergence
                         #print "jsdiv test"+str(0.5 * sum(pj * log (pj/(0.5*pi+0.5*pj+SMALL)), axis=-1) + 0.5 * sum(pi * log (pi/(0.5*pi + 0.5*pj+SMALL)), axis=-1))
                         jsdiv2[mychi] = 0.5 * sum(pj * log (pj/(0.5*pi+0.5*pj+SMALL)), axis=-1) + 0.5 * sum(pi * log (pi/(0.5*pi + 0.5*pj+SMALL)), axis=-1)
-			
+                        
 			
                 if(self.run_params1.options.grassberger == "no" and self.run_params1.options.abs == "yes"):
                     for mychi in range(nchi_to_use):
@@ -617,7 +732,7 @@ class KLdiv:
                 chisq = sqrt(chisq[:,:].sum(axis=-1))
                 chisq4 = zeros((6),float64)
                 chisq4[:nchi_to_use] = chisq
-                return (kldiv4, jsdiv4, chisq4)
+                return (kldiv4, jsdiv4, chisq4, ent1, ent2)
 
     #########################################################################################################################################
     ### __KL_resi_resj__ : For a single residue, calculates KLdiv, JSdiv, Chi-Squared
@@ -634,8 +749,13 @@ class KLdiv:
         self.jsdiv[:,:] = 0
         self.chisq[:,:] = 0
         #nchi1, nchi2 = res1.chi_pop_hist.shape[1], res2.chi_pop_hist.shape[1]
-        nchi1 = res1.get_num_chis(res1.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
-        nchi2 = res2.get_num_chis(res2.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
+        if(self.run_params1.phipsi >= 0):
+           nchi1 = res1.get_num_chis(res1.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
+           nchi2 = res2.get_num_chis(res2.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
+        elif(self.run_params1.phipsi == -4):
+             print "doing analysis of stress data"
+             nchi1 = 1 # just phi as a placeholder for a single variable
+             nchi2 = 1 # just phi as a placeholder for a single variable
         if self.run_params1.backbone == "coarse_phipsi":
             nchi1 = 1
         if self.run_params2.backbone == "coarse_phipsi":
@@ -659,11 +779,12 @@ class KLdiv:
                 print "counts j:"+str(int32(chi_counts2))+"\n"
                 print "pi      :"+str(chi_pop_hist1)+"\n"
                 print "pj      :"+str(chi_pop_hist2)+"\n"
-                (kldiv4, jsdiv4, chisq4) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
+                (kldiv4, jsdiv4, chisq4, ent1, ent2) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
                 self.kldiv[mybootstrap,:nchi_to_use] = kldiv4[:nchi_to_use]
                 self.jsdiv[mybootstrap,:nchi_to_use] = jsdiv4[:nchi_to_use]
                 self.chisq[mybootstrap,:nchi_to_use] = chisq4[:nchi_to_use]
-                
+                self.ent1[mybootstrap,:nchi_to_use]  = ent1[:nchi_to_use]
+                self.ent2[mybootstrap,:nchi_to_use]  = ent2[:nchi_to_use]
         else:  #usually here, res1 and res2 are from the same residue list, just different "runs" will be used through which_runs_ref and its complement
             print "res1 chi counts shape:"+str(res1.chi_counts.shape)
             minangles = min(sum(res1.chi_counts[0,0]), sum(res2.chi_counts[0,0])) #minimum of number of datapoints in each 
@@ -683,6 +804,10 @@ class KLdiv:
                 jsdiv4 = zeros((6),float64)
                 chi_counts1 = zeros((nchi_to_use,self.nbins),float64)
                 chi_counts2 = zeros((nchi_to_use,self.nbins),float64)
+                print "chi counts 1: "
+                print chi_counts1
+                print "chi counts 2: "
+                print chi_counts2
                 for myblock in range(self.subsample_choose_ref):
                     #we're only selecting the histogram of bin number = nbins, which is first variable entry "1"; a more optimal bin size could be chosen by computing kldiv from multiple
                     #print "which runs ref:"+str(self.which_runs_ref[mybootstrap,myblock])
@@ -718,14 +843,16 @@ class KLdiv:
                 chi_pop_hist2 = chi_counts2 / (1.0 * resize(sum(chi_counts2, axis = -1),chi_counts2.shape)) #normalization
                 chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
                 chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
-                (kldiv, jsdiv, chisq) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
+                (kldiv, jsdiv, chisq, ent1, ent2) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
                 self.kldiv[mybootstrap,:nchi_to_use] = kldiv[:nchi_to_use]
                 self.jsdiv[mybootstrap,:nchi_to_use] = jsdiv[:nchi_to_use]
                 self.chisq[mybootstrap,:nchi_to_use] = chisq[:nchi_to_use]
+                self.ent1[mybootstrap,:nchi_to_use] = ent1[:nchi_to_use]
+                self.ent2[mybootstrap,:nchi_to_use] = ent2[:nchi_to_use]
 
         print "kldiv:\n"+str(self.kldiv)
         print "KLDIV", res1.name, res1.num, fmt_floats(list((average(self.kldiv,axis=0)).flatten()), digits=6, length=9), "JSDIV", fmt_floats(list((average(self.jsdiv,axis=0)).flatten()), digits=6, length=9)
-        return self.kldiv, self.chisq, self.jsdiv
+        return self.kldiv, self.chisq, self.jsdiv, self.ent1, self.ent2
 
 
 
@@ -980,9 +1107,14 @@ class KLdiv:
         self.kldiv = zeros((self.bootstrap_sets, 6), float64) # KLdiv for one residue: max torsions per res=6
         self.chisq = zeros((self.bootstrap_sets, 6), float64) # Chi-Squared for one residue: max torsions per res=6
         self.jsdiv = zeros((self.bootstrap_sets, 6), float64) # Jensen-Shannon Divergence (JSdiv) for one residue: max torsions per res=6
+        self.ent1 = zeros((self.bootstrap_sets, 6), float64) # histogram entropy for one referece residue: max torsions per res=6
+        self.ent2 = zeros((self.bootstrap_sets, 6), float64) # histogram entropy for one target   residue: max torsions per res=6
         self.kldiv_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # KLdiv for all residues
         self.chisq_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # Chi-Squared for all residues
         self.jsdiv_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # JSdiv for all residues
+        self.ent1_res =  zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # Histogram entropy  for all residues of reference
+        self.ent2_res =  zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # Histogram entropy  for all residues of target
+        self.dS_res =  zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # Histogram entropy  for all residues of target
         self.sigalpha = min(run_params1.sigalpha, run_params2.sigalpha)              # significance value for significance test
         counter = 0
 	newreslist1 = []
@@ -990,10 +1122,11 @@ class KLdiv:
         for res1, res2 in zip(self.reslist1, self.reslist2):
             #consider refactoring this into a more functional form
             #calculate KLdiv between these two residues... this routine may later include higher-order terms and coord. transforms.
-            (self.kldiv_res[counter,:,:],  self.chisq_res[counter,:,:], self.jsdiv_res[counter,:,:]) = self.__KL_resi_resj__(res1,res2)
+            (self.kldiv_res[counter,:,:],  self.chisq_res[counter,:,:], self.jsdiv_res[counter,:,:], self.ent1_res[counter,:,:], self.ent2_res[counter,:,:]) = self.__KL_resi_resj__(res1,res2)
 	    newreslist1.append(Residue_Lite(res1.name,res1.num,res1.chain)) 
 	    newreslist2.append(Residue_Lite(res2.name,res2.num,res2.chain))
 	    counter += 1
+        self.dS_res = self.ent2_res - self.ent1_res #calculate delta entropy, will filter later for significance
 	#convert residue lists to a "lite" version for further use, to save lots of memory
 	del self.reslist1
 	del self.reslist2
@@ -1033,6 +1166,12 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
         phipsi = -1
         backbone_only = 1
         options.binwidth = 90 #override
+    if options.backbone == "stress":
+        phipsi = -4;
+        NumChis["GLY"] = 1
+        NumChis["ALA"] = 1
+        backbone_only = 1
+        print "performing stress analysis"
     bins=arange(-180,180,options.binwidth) #Compute bin edges
     nbins = len(bins)
     num_sims = options.num_sims
@@ -1101,7 +1240,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params1 = RunParameters(resfile_fn=resfile_fn1, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs1,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array, skip=options.skip,
-                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone )
+                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergance_points=options.num_convergance_points )
        
     ### SET REFERENCE = 1 
     options.reference = 1 #as this is the one with only one bootstrap, bootstrap_choose=num_sims
@@ -1110,7 +1249,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params2 = RunParameters(resfile_fn=resfile_fn2, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs2,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir2, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array2, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone)  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergance_points=options.num_convergance_points)  
     #but also use the subsets of the full reference ensemble to look at the variance of the local KL-divergence
 
     resfile_fn3 = resfile_fn1 #as reference is first one
@@ -1122,14 +1261,14 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params3 =  RunParameters(resfile_fn=resfile_fn3, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs3,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array3, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone )  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergance_points=options.num_convergance_points   )  
 
 
     pair_runs_array4 = pair_runs_array2
     run_params4 =  RunParameters(resfile_fn=resfile_fn4, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs4,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array4, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no")  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no", last_step=options.last_step, lagtime=None,  lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples , num_convergance_points=options.num_convergance_points )  
     
     
     ## LOAD DATA, GET A LIST OF CLASS ResidueChis ##
@@ -1170,7 +1309,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     if(options.num_sims > 1):
         print "\n filtering KLdiv and JSdiv using Null distribution from reference\n"
         oldkldiv = copy(mykldiv)
-        filter_div(mykldiv_ref, mykldiv_ref2, mykldiv)
+        filter_div(mykldiv_ref, mykldiv_ref2, mykldiv, correct=options.correct)
 
     ## Output Results ##
     print "\n outputting target kldiv's\n"
@@ -1199,9 +1338,9 @@ def test_kldiv(test_options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn
     bins=arange(-180,180,test_options.binwidth) #Compute bin edges
     nbins = len(bins)
 
-    chi_counts1 =   zeros((2, nbins), int64)
+    chi_counts1 =   zeros((2, nbins), float64)
     chi_pop_hist1 = zeros((2, nbins),float64)
-    chi_counts2 =   zeros((2, nbins), int64)
+    chi_counts2 =   zeros((2, nbins), float64)
     chi_pop_hist2 = zeros((2, nbins),float64)
     
     angles = zeros((2,2,test_options.num_sims,12001),float64)
@@ -1212,7 +1351,7 @@ def test_kldiv(test_options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn
     for dataset in range(2): 
       for jchi in range(2):
           for n in range(test_options.num_sims):
-                (data, title) = readxvg(str(kdir[dataset])+"run"+str(n+1)+"/chi"+str(jchi+1)+"PHE78.xvg",1,0)
+                (data, title) = readxvg(str(kdir[dataset])+"run"+str(n+1)+"/chi"+str(jchi+1)+"PHE78.xvg",1,0,None)
                 thisnumangles[dataset] = min(thisnumangles[dataset],len(data[:,1]))
                 angles[dataset,jchi,n,:thisnumangles[dataset]] = data[:thisnumangles[dataset],1]
                 anglestemp = angles[dataset,jchi,n,:thisnumangles[dataset]]
@@ -1315,20 +1454,26 @@ if __name__ == "__main__":
     parser.add_option("-o", "--bootstrap_set_size", default = None, type = "int", help="perform bootstrapping within this script; value is the size of the subsets to use")
     parser.add_option("-k", "--mutual_divergence", default = "no", type =  "string", help="calculate 2nd-order terms in KL-divergence expansion")
     parser.add_option("-f", "--pdbfile", default = None, type = "string", help="pdb structure file for additional 3-coord cartesian per residue")
-    parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in 'run' subdirectories for additional 3-coord cartesian per residue")
+    parser.add_option("-q", "--xtcfile", default = None, type = "string", help="gromacs xtc prefix in reference 'run' subdirectories for additional 3-coord cartesian per residue")
+    parser.add_option("-Q", "--xtcfile2", default = None, type = "string", help="gromacs xtc prefix in target 'run' subdirectories for additional 3-coord cartesian per residue")
     parser.add_option("-e","--output_timeseries", default = "no", type = "string", help="output corrected dihedral timeseries (requires more memory) yes|no ")
-    
-    
+    parser.add_option("-l", "--last_step", default=None, type= "int", help="last step to read from input files, useful for convergence analysis")
+    parser.add_option("-c", "--correct", default="yes", type="string", help="correct KLdiv/JSdiv values for null hypothesis expectation")
+    parser.add_option("-M","--markov_samples", default = 0, type = "int", help="markov state model samples to use for independent distribution")
+    parser.add_option("-L","--lagtime_interval", default = None, type=int, help="base snapshot interval to use for lagtimes in Markov model of bin transitions")
+    parser.add_option("-C","--num_convergance_points", default = 0, type=int, help="for -n == -o , use this many subsets of the data to look at convergance statistics") 
     ## SETUP RUN PARAMETERS ##    
     run_params1 = 'None'
     run_params2 = 'None'
     run_params3 = 'None'
     (options,args)=parser.parse_args()
+    
     mycompiler=options.gcc
     options.adaptive = "no" # KLdiv first order cannot use adaptive partitioning unless dihedrals were ranked ordered for two systems (i.e. residue lists) together
     
     print "COMMANDS: ", " ".join(sys.argv)
-    
+    print "options: "
+    print options
     #adaptive_partitioning = (options.adaptive == "yes")  #want "yes" for second-order term
     
     if(options.backbone == "coarse_phipsi"):

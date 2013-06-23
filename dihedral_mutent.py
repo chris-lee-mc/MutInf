@@ -4347,13 +4347,13 @@ class ResidueChis:
        myname = self.name
        mynumchis = self.get_num_chis(myname)
        print "correcting and shifting cartesians"
-       # shift cartesians to [0, 360] so binning will be compatible for angular data
+       # shift cartesians to [0, 360) so binning will be compatible for angular data
        # we don't know if all the sims are aligned togther.. if so, then shifting shoud be done for whole dataset not each sim separately 
        for i in range((shape(shifted_carts))[0]):
               for j in range ((shape(shifted_carts))[1]):                     
                      shifted_carts[i,j,:] = shifted_carts[i,j,:] - min(shifted_carts[i,j,:]) #shift so min at zero
                      if( max(shifted_carts[i,j,:] - min(shifted_carts[i,j,:] ) > 0 ) ):
-                         shifted_carts[i,j,:] = (shifted_carts[i,j,:] * 360.0 / \
+                         shifted_carts[i,j,:] = (shifted_carts[i,j,:] * (360.0 - SMALL) / \
                                             (max(shifted_carts[i,j,:]) - min(shifted_carts[i,j,:]))) 
                          #shifted_carts[i,j,:] = shifted_carts[i,j,:] + min(shifted_carts[i,j,:])
        
@@ -4933,7 +4933,7 @@ class ResidueChis:
           for i in range(1,self.nbins):   #use cdf of weights from bootstraps                 
               self.adaptive_hist_left_breaks[bootstrap,i] = searchsorted( cumulative_boot_weights[bootstrap, :self.numangles_bootstrap[bootstrap] - 1 ], number_per_ent_bin * i) + SMALL #since searchsorted returns an array, have to get element 0 from it, corresponding to the insertion point of "number_per_ent_bin * i"
               print "adaptive histogram bin left-side breaks: bin "+str(i)+ " value: "+str(self.adaptive_hist_left_breaks[bootstrap,i])
-          self.adaptive_hist_left_breaks[bootstrap,-1] = self.numangles_bootstrap[bootstrap]
+          self.adaptive_hist_left_breaks[bootstrap,-1] = self.numangles_bootstrap[bootstrap] + SMALL
           print "adaptive histogram bin left-side breaks: bin "+str(nbins)+ " value: "+str(self.adaptive_hist_left_breaks[bootstrap,nbins])
 
       #### adaptive_hist_left_breaks sequential will be different for each sim

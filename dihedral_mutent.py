@@ -684,6 +684,79 @@ def exponential_fit(x, y):
 
 
 
+
+
+#########################################################################################################################################
+#####  Python histogram and MI routines for testing
+#########################################################################################################################################
+
+def entropy(counts):
+    '''Compute entropy.'''
+    ps = counts/float(sum(counts))  # coerce to float and normalize
+    ps = ps[nonzero(ps)]            # toss out zeros
+    H = -sum(ps * numpy.log2(ps))   # compute entropy
+    
+    return H
+
+def python_mi_bins(x, y, bins):
+    '''Compute mutual information'''
+    counts_xy = histogram2d(x, y, bins=bins, range=[[0, 311335], [0, 311335]])[0]
+    counts_x  = histogram(  x,    bins=bins, range=[0, 311335])[0]
+    counts_y  = histogram(  y,    bins=bins, range=[0, 311335])[0]
+    
+    H_xy = entropy(counts_xy)
+    H_x  = entropy(counts_x)
+    H_y  = entropy(counts_y)
+    
+    return H_x + H_y - H_xy
+
+
+def python_mi(x, y):
+    '''Compute mutual information'''
+    counts_xy = histogram2d(x, y, bins=bins, range=[[min(x), max(x)], [min(y), max(y)]])[0]
+    counts_x  = histogram(  x,    bins=bins, range=[min(x), max(x)])[0]
+    counts_y  = histogram(  y,    bins=bins, range=[min(y), max(y)])[0]
+    
+    H_xy = entropy(counts_xy)
+    H_x  = entropy(counts_x)
+    H_y  = entropy(counts_y)
+    
+    return H_x + H_y - H_xy
+
+
+def kde_python_mi(x,y):
+       from scipy.stats import gaussian_kde
+       from scipy.integrate import dblquad
+       # Constants
+       MIN_DOUBLE = 4.9406564584124654e-324 
+                    # The minimum size of a Float64; used here to prevent the
+                    #  logarithmic function from hitting its undefined region
+                    #  at its asymptote of 0.
+       INF = float('inf')  # The floating-point representation for "infinity"
+
+       # x and y are previously defined as collections of 
+       # floating point values with the same length
+
+       # Kernel estimation
+       gkde_x = gaussian_kde(x)
+       gkde_y = gaussian_kde(y)
+
+       if len(binned_x) != len(binned_y) and len(binned_x) != len(x):
+              x.append(x[0])
+              y.append(y[0])
+
+       gkde_xy = gaussian_kde([x,y])
+       mutual_info = lambda a,b: gkde_xy([a,b]) * \
+           math.log((gkde_xy([a,b]) / ((gkde_x(a) * gkde_y(b)) + MIN_DOUBLE)) \
+        + MIN_DOUBLE)
+
+       # Compute MI(X,Y)
+       (minfo_xy, err_xy) = \
+           dblquad(mutual_info, -INF, INF, lambda a: 0, lambda a: INF)
+
+       print 'debug: KDE mutual info minfo_xy = ', minfo_xy
+       return minfo_xy
+
 #########################################################################################################################################
 ##### RunParameters class:  Stores the parameters for an Entropy/Mutinf calculation run #################################################
 #########################################################################################################################################
@@ -4208,6 +4281,9 @@ class ResidueChis:
                                           i += 1
                                 count += 1
                          self.numangles[sequential_sim_num] = i
+                         if sequential_sim_num == 0: #test mutual information between first and second Cartesian for debugging
+                                print "debug: naive histogram mutual information of cart 1 x vs cart 2 x: "+str(python_mi(xtc_coords.coords[0,0,0,:], xtc_coords.coords[0,1,0,:]))
+                                print "debug: kernel density  mutual information of cart 1 x vs cart 2 x: "+str(kde_python_mi(xtc_coords.coords[0,0,0,:], xtc_coords.coords[0,1,0,:]))
                          xtc_and_pdb_data[sequential_sim_num].trajectory.rewind() #reset for next use
                  else: #get numangles from xtc_coords
                      self.numangles[sequential_sim_num] = xtc_coords.numangles

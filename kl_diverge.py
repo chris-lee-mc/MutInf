@@ -3,6 +3,7 @@
 # Released under Lesser GNU Public License
 
 from dihedral_mutent import *
+from input_output import *
 from optparse import OptionParser
 from utils import arr2str2, fmt_floats
 from Bio.PDB import PDBIO
@@ -400,6 +401,7 @@ class KLdiv:
                             (resnum) = mymatch.groups()
                             print "match: "+str(res1.num)+" "+str(resnum)
                             test = 1
+                            break #no need to consider next chain
                         else:
                             print "did not match"
                 except:
@@ -422,6 +424,92 @@ class KLdiv:
         w.set_structure(structure)
         w.save(outpdb)
             
+
+    def replace_bfac_res_tor(self, replacements, structure, outpdb):        
+        model = structure[0]
+        counter1 = 0
+        numchain_re = re.compile(r'\s*([0-9]+)([A-Z]*).*')
+        numchain_re2 = re.compile(r'\s*([0-9]+).*')
+        for res1 in self.reslist1:
+            test = None
+            
+            print "numchain: "+str(res1.num)+str(res1.chain)+" resname: "+str(res1.name)
+            mymatch = numchain_re.match(str(res1.num)+str(res1.chain))
+            if mymatch != None:
+                (resnum, reschain) = mymatch.groups()
+                print "match: "+str(res1.num)+" "+str(resnum)
+                if(reschain == ''):
+                    reschain = ' '
+                test = 1
+            else:  
+                try:
+                    #model must have only one chain or resfile didn't specify chain or can't find match
+                    for chain in model:
+                        reschain = chain.id
+                        print "reschain: "+str(reschain)
+                        #test = model[reschain]
+                        mymatch = numchain_re2.match(str(res1.num))
+                        if mymatch != None:
+                            (resnum) = mymatch.groups()
+                            print "match: "+str(res1.num)+" "+str(resnum)
+                            test = 1
+                        else:
+                            print "did not match"
+                except:
+                    print "did not match"
+            try:
+                if(test != None):
+                    print "chain: "+str(reschain)
+                    for atom in model[reschain][int(resnum)]:
+                        print "atom: "+str(atom.id)
+                        #SET TO ZERO, THEN REPLACE PARTICULAR ATOMS ON A PER-TORSION BASIS
+                        atom.bfactor = 0
+
+                    #sum(average(replacements[counter1,:,:],axis=0))
+                    myres = model[reschain][int(resnum)]
+                    myres.N.bfactor = average(replacements[counter1,:,0],axis=0) #phi
+                    myres.C.bfactor = average(replacements[counter1,:,1],axis=0) #psi
+                    
+                    #chi 1
+                    if(res1.name != "GLY" and res1.name != "ALA"):
+                       myres.CA.bfactor = average(replacements[counter1,:,2],axis=0) #give it Chi1's color
+                       myres.CB.bfactor = average(replacements[counter1,:,2],axis=0) #give it Chi1's color
+
+                    #chi 2
+                    if(res1.name == "GLY" or res1.name == "ALA"):
+                       pass
+                    elif(res1.name == "SER" or res1.name == "THR"):
+                       myres.OG.bfactor = average(replacements[counter1,:,3],axis=0) #give it Chi2's color
+                    elif(res1.name == "CYS" or res1.name == "CYX"):
+                       myres.SG.bfactor = average(replacements[counter1,:,3],axis=0) #give it Chi2's color
+                    elif(res1.name != "VAL"):
+                       myres.CG.bfactor = average(replacements[counter1,:,3],axis=0) #give it Chi2's color
+                    
+                    #chi 3
+                    if(res1.name == "MET"):
+                        myres.SD.bfactor = average(replacements[counter1,:,4],axis=0) #give it Chi3's color
+                    elif(res1.name == "GLU" or res1.name == "GLN" or res1.name == "LYS" or res1.name == "ARG"):
+                        myres.CD.bfactor = average(replacements[counter1,:,4],axis=0) #give it Chi3's color
+                     
+                    #chi 4
+                    if(res1.name == "LYS"):
+                        myres.CE.bfactor = average(replacements[counter1,:,5],axis=0) #give it Chi3's color
+                    if(res1.name == "ARG"):
+                        myres.NE.bfactor = average(replacements[counter1,:,5],axis=0) #give it Chi3's color
+
+            except:
+                for chain in model:
+                    print "empty chain name: "+str(chain.id)
+                    for atom in chain[int(resnum)]:
+                        print "atom: "+str(atom.id)
+                        #HERE WE WILL INSTEAD REPLACE BASED ON PHI PSI OR CHI ATOM
+                        atom.bfactor = sum(average(replacements[counter1,:,:],axis=0))
+            counter1 +=1 
+            
+        w = PDBIO()
+        w.set_structure(structure)
+        w.save(outpdb)
+            
     
     def write_pdbs(self, postfix = None):
         if(postfix == None):
@@ -431,25 +519,31 @@ class KLdiv:
         parser = PDBParser()
         prefix=str(self.run_params1.resfile_fn)+str(self.run_params2.resfile_fn)
         kl_pdbfile = prefix + "_kldiv" + postfix + ".pdb"
+        kl_tor_pdbfile = prefix + "_kldiv" + postfix + "_tor.pdb"
         js_pdbfile = prefix + "_jsdiv" + postfix + ".pdb"
+        js_tor_pdbfile = prefix + "_jsdiv" + postfix + "_tor.pdb"
         ent1_pdbfile = prefix + "_ent_ref" + postfix + ".pdb"
         ent2_pdbfile = prefix + "_ent_targ" + postfix + ".pdb"
         dS_pdbfile = prefix + "_ent_delta" + postfix + ".pdb"
+        dS_tor_pdbfile = prefix + "_ent_delta" + postfix + "_tor.pdb"
         try:
             structure_kl = parser.get_structure('self1', PDB_input)
             self.replace_bfac_res(self.kldiv_res * 50, structure_kl, kl_pdbfile)
+            self.replace_bfac_res_tor(self.kldiv_res * 50, structure_kl, kl_tor_pdbfile)
             structure_js = parser.get_structure('self2', PDB_input)
             self.replace_bfac_res(self.jsdiv_res * 50, structure_js, js_pdbfile)
+            self.replace_bfac_res_tor(self.jsdiv_res * 50, structure_js, js_tor_pdbfile)
             structure_ent1 = parser.get_structure('self3', PDB_input)
             self.replace_bfac_res(self.ent1_res, structure_ent1, ent1_pdbfile)
             structure_ent2 = parser.get_structure('self4', PDB_input)
             self.replace_bfac_res(self.ent2_res, structure_ent2, ent2_pdbfile)
             structure_dS = parser.get_structure('self5', PDB_input)
             self.replace_bfac_res(self.dS_res, structure_dS, dS_pdbfile)
+            self.replace_bfac_res_tor(self.dS_res, structure_dS, dS_tor_pdbfile)
             
         except:
             print "Sorry, BioPython didn't like your pdb most likely, you will have to use replace_res_bfac_mut.pl to replace the b-factors in the pdb for this case\n"
-
+        
     
     def output_cov(self):
         prefix=str(self.run_params1.resfile_fn)+str(self.run_params2.resfile_fn)
@@ -508,6 +602,11 @@ class KLdiv:
         pymolfile_ent1 = open(prefix+"_ent_ref.pml",'w')
         pymolfile_ent2 = open(prefix+"_ent_targ.pml",'w')
         pymolfile_dS = open(prefix+"_ent_delta.pml",'w')
+        pymolfile_kl_tor = open(prefix+"_kldiv_colortor.pml",'w')
+        pymolfile_js_tor = open(prefix+"_jsdiv_colortor.pml",'w')
+        pymolfile_ent1_tor = open(prefix+"_ent_ref_colortor.pml",'w')
+        pymolfile_ent2_tor = open(prefix+"_ent_targ_colortor.pml",'w')
+        pymolfile_dS_tor = open(prefix+"_ent_delta_colortor.pml",'w')
         PDB_input = self.run_params1.pdbfile
         # first, output data for each bootstrap separately
         bootstraps = self.bootstrap_sets
@@ -577,7 +676,7 @@ class KLdiv:
             allfile_ent2.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.ent2_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
 
             sumfile_dS.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(average(self.dS_res[counter1,mybootstrap,:], axis=0)))+"\n")
-            allfile_dS.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.dS_res[counter1,mybootstrap,:],axis=0)).flatten()), digits=6, length=9)+"\n")
+            allfile_dS.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+fmt_floats(list((average(self.dS_res[counter1,:,:],axis=0)).flatten()), digits=6, length=9)+"\n")
                            
 
             counter1 += 1
@@ -588,10 +687,19 @@ class KLdiv:
 	postfix = ""
         prefix=str(self.run_params1.resfile_fn)+str(self.run_params2.resfile_fn)
         kl_pdbfile = prefix + "_kldiv" + postfix + ".pdb"
+        kl_tor_pdbfile = prefix + "_kldiv" + postfix + "_tor.pdb"
         js_pdbfile = prefix + "_jsdiv" + postfix + ".pdb"
+        js_tor_pdbfile = prefix + "_jsdiv" + postfix + "_tor.pdb"
         ent1_pdbfile = prefix + "_ent_ref" + postfix + ".pdb"
         ent2_pdbfile = prefix + "_ent_targ" + postfix + ".pdb"
         dS_pdbfile = prefix + "_ent_delta" + postfix + ".pdb"
+        dS_tor_pdbfile = prefix + "_ent_delta" + postfix + "_tor.pdb"
+        
+        #kl_pdbfile = prefix + "_kldiv" + postfix + ".pdb"
+        #js_pdbfile = prefix + "_jsdiv" + postfix + ".pdb"
+        #ent1_pdbfile = prefix + "_ent_ref" + postfix + ".pdb"
+        #ent2_pdbfile = prefix + "_ent_targ" + postfix + ".pdb"
+        #dS_pdbfile = prefix + "_ent_delta" + postfix + ".pdb"
         
         pymolfile_kl.write("from pymol import cmd"+"\n")
         pymolfile_kl.write("load "+str(kl_pdbfile)+", system \n")
@@ -609,6 +717,22 @@ class KLdiv:
         pymolfile_js.write("cmd.disable('b0')"+"\n")
         pymolfile_js.write("cmd.bg_color('white')"+"\n")
 
+        pymolfile_kl_tor.write("from pymol import cmd"+"\n")
+        pymolfile_kl_tor.write("load "+str(kl_tor_pdbfile)+", system \n")
+        pymolfile_kl_tor.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
+        pymolfile_kl_tor.write("sele b0, b < 0.00001"+"\n")
+        pymolfile_kl_tor.write("cmd.color(5278, 'b0')"+"\n")
+        pymolfile_kl_tor.write("cmd.disable('b0')"+"\n")
+        pymolfile_kl_tor.write("cmd.bg_color('white')"+"\n")
+        
+        pymolfile_js_tor.write("from pymol import cmd"+"\n")
+        pymolfile_js_tor.write("load "+str(js_tor_pdbfile)+", system \n")
+        pymolfile_js_tor.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
+        pymolfile_js_tor.write("sele b0, b < 0.00001"+"\n")
+        pymolfile_js_tor.write("cmd.color(5278, 'b0')"+"\n")
+        pymolfile_js_tor.write("cmd.disable('b0')"+"\n")
+        pymolfile_js_tor.write("cmd.bg_color('white')"+"\n")
+
         pymolfile_ent1.write("from pymol import cmd"+"\n")
         pymolfile_ent1.write("load "+str(ent1_pdbfile)+", system \n")
         pymolfile_ent1.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
@@ -624,7 +748,7 @@ class KLdiv:
         pymolfile_ent2.write("cmd.color(5278, 'b0')"+"\n")
         pymolfile_ent2.write("cmd.disable('b0')"+"\n")
         pymolfile_ent2.write("cmd.bg_color('white')"+"\n")
-
+ 
 
         ### add Robert L. Campbell's function to modify the color bar 
         MutInf_Path = os.path.dirname(os.path.abspath(__file__))
@@ -638,6 +762,236 @@ class KLdiv:
         pymolfile_dS.write("cmd.color(5278, 'b0')"+"\n")
         pymolfile_dS.write("cmd.disable('b0')"+"\n")
         pymolfile_dS.write("cmd.bg_color('white')"+"\n")
+
+        pymolfile_dS_tor.write("run "+str(MutInf_Path)+"/color_b.py \n")
+        #pymolfile_dS.write("from pymol import cmd"+"\n")
+        pymolfile_dS_tor.write("load "+str(dS_tor_pdbfile)+", system \n")
+        pymolfile_dS_tor.write("preset.pretty('system')"+"\n")  #,_self=cmd"+"\n")
+        pymolfile_dS_tor.write("color_b(selection='b<0',gradient='bw',mode='hist')\n")
+        pymolfile_dS_tor.write("color_b(selection='b>0',gradient='wr',mode='hist')\n")
+        pymolfile_dS_tor.write("sele b0, b < 0.00001 and b > -0.00001 "+"\n")
+        pymolfile_dS_tor.write("cmd.color(5278, 'b0')"+"\n")
+        pymolfile_dS_tor.write("cmd.disable('b0')"+"\n")
+        pymolfile_dS_tor.write("cmd.bg_color('white')"+"\n")
+
+        pymol_bfactor_column_to_bonds_coloring = """
+
+cmd.show('sticks','((byres (system))&n;ca,c,n,o,h)') 
+#cmd.show('sticks','((byres (system))&(!(n;c,o,h|(n. n&!r. pro)))) and not b0')
+#cmd.show('sticks','system and (not b0)')
+cmd.hide('sticks'    ,'name O')
+cmd.hide('lines'    ,'name O') 
+stored.list=[]
+stored.list1=[]
+stored.list2=[]
+stored.list3=[]
+cmd.iterate("(name ca)","stored.list1.append((resi,resn,color))")
+cmd.iterate("(name n)","stored.list2.append((resi,resn,color))")
+cmd.iterate("(name c)","stored.list3.append((resi,resn,color))")
+#print stored.list
+
+#python
+i = 0
+
+cmd.set_bond('stick_color', 5278 ,'system and (name C,N)')
+python
+
+for resnum_name in stored.list1: 
+     cmd.select('this_res','resi '+str(resnum_name[0]))
+     print "this res: "+str(resnum_name[0])
+     cmd.select('this_res_N','this_res and name N')
+     cmd.select('this_res_CA','this_res and name CA')
+     cmd.select('this_res_C','this_res and name C')
+
+     try:
+       cmd.select('this_res_N','this_res and name N')
+       stored.temp_list=[]
+       cmd.iterate('this_res_N','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name N,CA)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name N,CA)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name N,CA)')
+       #print "coloring N-CA: "+str(stored.temp_list[0])
+     except IndexError:
+     	    pass
+     try:
+       cmd.select('this_res_C','this_res and name C')
+       stored.temp_list=[]
+       cmd.iterate('this_res_C','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CA,C)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CA,C)')
+       
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CA,C)')
+       #print "coloring CA-C: "+str(stored.temp_list[0])
+     except IndexError:
+     	    pass
+
+     #cmd.set_bond('stick_color',stored.list2[i][2],'this_res and (name N,CA)')
+     #cmd.set_bond('stick_color',stored.list3[i][2],'this_res and (name CA,C)')
+
+     try:
+       cmd.select('this_res_CB','this_res and name CB')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CB','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CA,CB)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CA,CB)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CA,CB)')
+       print "coloring CA-CB: "+str(stored.temp_list[0])
+     except IndexError:
+     	    pass
+     try:	  
+       cmd.select('this_res_SG','this_res and name SG')
+       stored.temp_list=[]
+       cmd.iterate('this_res_SG','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,SG)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,SG)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,SG)')
+       print "coloring CB-SG: "+str(stored.temp_list[0])
+     except IndexError:
+      	    pass
+     try:
+       cmd.select('this_res_OG','this_res and name OG')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OG','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,OG)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,OG)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,OG)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_CG','this_res and name CG')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CG','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,CG)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,CG)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,CG)')
+       print "coloring CB-CG: "+str(stored.temp_list[0])
+       
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_CG1','this_res and name CG1')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CG1','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,CG1)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,CG1)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,CG1)')
+     except IndexError:
+      	    pass
+     try:
+       cmd.select('this_res_CG2','this_res and name CG2')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CG2','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,CG2)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,CG2)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,CG2)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_OD1','this_res and name OD1')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OD1','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,OD1)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,OD1)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,OD1)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_OD2','this_res and name OD2')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OD2','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,OD2)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,OD2)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,OD2)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_CD','this_res and name CD')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CD','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,CD)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,CD)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,CD)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_SD','this_res and name SD')
+       stored.temp_list=[]
+       cmd.iterate('this_res_SD','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,SD)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,SD)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,SD)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_CE','this_res and name CE')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CE','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,CE)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,CE)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,CE)')
+     except IndexError:
+      	    pass
+     try:
+       cmd.select('this_res_NE','this_res and name NE')
+       stored.temp_list=[]
+       cmd.iterate('this_res_NE','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,NE)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,NE)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,NE)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_OE1','this_res and name OE1')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OE1','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,OE1)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,OE1)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,OE1)')
+     except IndexError:
+      	    pass
+
+     try:
+       cmd.select('this_res_OE2','this_res and name OE2')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OE2','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,OE2)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,OE2)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,OE2)')
+     except IndexError:
+      	    pass
+
+     i += 1
+
+
+python end
+
+END
+
+"""
 
         maxfile_kl.close()
         sumfile_kl.close()
@@ -837,8 +1191,8 @@ class KLdiv:
                     #print "counts full chi 0:   "+str(res1.chi_counts[:,0,:])
                     #print "counts example:"+str(res1.chi_counts[:,:nchi_to_use,leftstop1:rightstop1])
                 
-                #print "chi_counts1:"+str(int16(chi_counts1))
-                #print "chi_counts2:"+str(int16(chi_counts2))
+                print "chi_counts1:"+str(int16(chi_counts1))
+                print "chi_counts2:"+str(int16(chi_counts2))
                 chi_pop_hist1 = chi_counts1 / (1.0 * resize(sum(chi_counts1, axis = -1),chi_counts1.shape)) #normalization
                 chi_pop_hist2 = chi_counts2 / (1.0 * resize(sum(chi_counts2, axis = -1),chi_counts2.shape)) #normalization
                 chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
@@ -1134,7 +1488,8 @@ class KLdiv:
 	self.reslist2 = newreslist2
 	
         self.kldiv_done = 1 # flag
-
+        
+        # Will use this later in output
 
 #######################################################################################################################################
 ###
@@ -1240,7 +1595,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params1 = RunParameters(resfile_fn=resfile_fn1, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs1,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array, skip=options.skip,
-                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergance_points=options.num_convergance_points )
+                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points )
        
     ### SET REFERENCE = 1 
     options.reference = 1 #as this is the one with only one bootstrap, bootstrap_choose=num_sims
@@ -1249,7 +1604,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params2 = RunParameters(resfile_fn=resfile_fn2, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs2,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir2, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array2, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergance_points=options.num_convergance_points)  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points)  
     #but also use the subsets of the full reference ensemble to look at the variance of the local KL-divergence
 
     resfile_fn3 = resfile_fn1 #as reference is first one
@@ -1261,14 +1616,14 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params3 =  RunParameters(resfile_fn=resfile_fn3, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs3,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array3, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergance_points=options.num_convergance_points   )  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points   )  
 
 
     pair_runs_array4 = pair_runs_array2
     run_params4 =  RunParameters(resfile_fn=resfile_fn4, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs4,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array4, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no", last_step=options.last_step, lagtime=None,  lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples , num_convergance_points=options.num_convergance_points )  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no", last_step=options.last_step, lagtime=None,  lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples , num_convergence_points=options.num_convergence_points )  
     
     
     ## LOAD DATA, GET A LIST OF CLASS ResidueChis ##
@@ -1461,7 +1816,7 @@ if __name__ == "__main__":
     parser.add_option("-c", "--correct", default="yes", type="string", help="correct KLdiv/JSdiv values for null hypothesis expectation")
     parser.add_option("-M","--markov_samples", default = 0, type = "int", help="markov state model samples to use for independent distribution")
     parser.add_option("-L","--lagtime_interval", default = None, type=int, help="base snapshot interval to use for lagtimes in Markov model of bin transitions")
-    parser.add_option("-C","--num_convergance_points", default = 0, type=int, help="for -n == -o , use this many subsets of the data to look at convergance statistics") 
+    parser.add_option("-C","--num_convergence_points", default = 0, type=int, help="for -n == -o , use this many subsets of the data to look at convergence statistics") 
     ## SETUP RUN PARAMETERS ##    
     run_params1 = 'None'
     run_params2 = 'None'

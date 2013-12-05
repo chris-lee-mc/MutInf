@@ -2542,31 +2542,31 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
     for mybootstrap in range(bootstrap_sets):
            Counts_ij[mybootstrap,:,:] = (count_matrix[mybootstrap,mypermutation,:]).reshape(nbins,nbins)
 
-    
-    if plot_2d_histograms and file_prefix != None:
-        file_prefix = file_prefix.replace(":", "_").replace(" ", "_")
-        print file_prefix
-    
-        Pij[1:, 0] = PiPj[1:,0] = bins #i.e. bin cut points 0 to 360, nbins in length
-        Pij[0, 1:] = PiPj[0,1:] = bins #i.e. bin cut points 0 to 360, nbins in length
-    
-        #Pij[1:,1:]  = average(count_matrix[:,permutation,:], axis=0).reshape((nbins,nbins))
-        #PiPj[1:,1:] = average(ninj_flat_Bayes[:,permutation,:], axis=0).reshape((nbins,nbins))
-        Pij[1:,1:] /= sum(Pij[1:,1:])
-        PiPj[1:,1:] /= sum(PiPj[1:,1:])
-    
-        res1_str = "_".join(file_prefix.split("_")[:2])
-        dirname = "plots_of_Pij_PiPj_nsims%d_nstructs%d_p%d_a%s/%s" % (num_sims, numangles_bootstrap[0]/len(which_runs[0]), 0, adaptive_partitioning, res1_str)
-        utils.mkdir_cd(dirname)
-        
-        open("%s_Pij.dat"%file_prefix, "w").write(utils.arr2str2(Pij, precision=8))
-        open("%s_PiPj.dat"%file_prefix, "w").write(utils.arr2str2(PiPj, precision=8))
-        #open("%s_Pij_div_PiPj.dat"%file_prefix, "w").write(utils.arr2str2(Pij_div_PiPj, precision=8))
-        utils.run("R --no-restore --no-save --no-readline %s_Pij.dat < ~/bin/dihedral_2dhist_plots.R" % (file_prefix))
-        utils.run("R --no-restore --no-save --no-readline %s_PiPj.dat < ~/bin/dihedral_2dhist_plots.R" % (file_prefix))
-        #utils.run("rm -f %s_*.dat" % file_prefix)
-
-        utils.cd("../..")
+    ### Old plot 2d histograms -- now a file with the twoD histogram counts is made if plot_2d_histograms == True  for use by another script
+    #if plot_2d_histograms and file_prefix != None:
+    #    file_prefix = file_prefix.replace(":", "_").replace(" ", "_")
+    #    print file_prefix
+    # 
+    #    Pij[1:, 0] = PiPj[1:,0] = bins #i.e. bin cut points 0 to 360, nbins in length
+    #    Pij[0, 1:] = PiPj[0,1:] = bins #i.e. bin cut points 0 to 360, nbins in length
+    #
+    #    #Pij[1:,1:]  = average(count_matrix[:,permutation,:], axis=0).reshape((nbins,nbins))
+    #    #PiPj[1:,1:] = average(ninj_flat_Bayes[:,permutation,:], axis=0).reshape((nbins,nbins))
+    #    Pij[1:,1:] /= sum(Pij[1:,1:])
+    #    PiPj[1:,1:] /= sum(PiPj[1:,1:])
+    #
+    #    res1_str = "_".join(file_prefix.split("_")[:2])
+    #    dirname = "plots_of_Pij_PiPj_nsims%d_nstructs%d_p%d_a%s/%s" % (num_sims, numangles_bootstrap[0]/len(which_runs[0]), 0, adaptive_partitioning, res1_str)
+    #    utils.mkdir_cd(dirname)
+    #    
+    #    open("%s_Pij.dat"%file_prefix, "w").write(utils.arr2str2(Pij, precision=8))
+    #    open("%s_PiPj.dat"%file_prefix, "w").write(utils.arr2str2(PiPj, precision=8))
+    #    #open("%s_Pij_div_PiPj.dat"%file_prefix, "w").write(utils.arr2str2(Pij_div_PiPj, precision=8))
+    #    utils.run("R --no-restore --no-save --no-readline %s_Pij.dat < ~/bin/dihedral_2dhist_plots.R" % (file_prefix))
+    #    utils.run("R --no-restore --no-save --no-readline %s_PiPj.dat < ~/bin/dihedral_2dhist_plots.R" % (file_prefix))
+    #    #utils.run("rm -f %s_*.dat" % file_prefix)
+    #
+    #    utils.cd("../..")
     
 
 
@@ -3574,9 +3574,9 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
                      xtc_dist_matrix_cutoff_filter7[:,res2,res1] = xtc_dist_matrix_cutoff_filter7[:,res1,res2]
                      xtc_dist_matrix_cutoff_filter8[:,res2,res1] = xtc_dist_matrix_cutoff_filter8[:,res1,res2]
                      xtc_dist_matrix_cutoff_filter9[:,res2,res1] = xtc_dist_matrix_cutoff_filter9[:,res1,res2]
-                     xtc_dist_matrix_cutoff_filter10[:,res2,res1] = xtc_dist_matrix_cutoff_filter9[:,res1,res2]
-                     xtc_dist_matrix_cutoff_filter11[:,res2,res1] = xtc_dist_matrix_cutoff_filter9[:,res1,res2]
-                     xtc_dist_matrix_cutoff_filter12[:,res2,res1] = xtc_dist_matrix_cutoff_filter9[:,res1,res2]
+                     xtc_dist_matrix_cutoff_filter10[:,res2,res1] = xtc_dist_matrix_cutoff_filter10[:,res1,res2]
+                     xtc_dist_matrix_cutoff_filter11[:,res2,res1] = xtc_dist_matrix_cutoff_filter11[:,res1,res2]
+                     xtc_dist_matrix_cutoff_filter12[:,res2,res1] = xtc_dist_matrix_cutoff_filter12[:,res1,res2]
 
        xtc_dist_matrix_cutoff_filter_avg = average( xtc_dist_matrix_cutoff_filter, axis=0)
        xtc_dist_matrix_cutoff_filter_avg2 = average( xtc_dist_matrix_cutoff_filter2, axis=0)
@@ -3587,9 +3587,9 @@ def output_distance_matrix_variances(bootstrap_sets,bootstrap_choose,which_runs,
        xtc_dist_matrix_cutoff_filter_avg7 = average( xtc_dist_matrix_cutoff_filter7, axis=0)
        xtc_dist_matrix_cutoff_filter_avg8 = average( xtc_dist_matrix_cutoff_filter8, axis=0)
        xtc_dist_matrix_cutoff_filter_avg9 = average( xtc_dist_matrix_cutoff_filter9, axis=0)
-       xtc_dist_matrix_cutoff_filter_avg10 = average( xtc_dist_matrix_cutoff_filter9, axis=0)
-       xtc_dist_matrix_cutoff_filter_avg11 = average( xtc_dist_matrix_cutoff_filter9, axis=0)
-       xtc_dist_matrix_cutoff_filter_avg12 = average( xtc_dist_matrix_cutoff_filter9, axis=0)
+       xtc_dist_matrix_cutoff_filter_avg10 = average( xtc_dist_matrix_cutoff_filter10, axis=0)
+       xtc_dist_matrix_cutoff_filter_avg11 = average( xtc_dist_matrix_cutoff_filter11, axis=0)
+       xtc_dist_matrix_cutoff_filter_avg12 = average( xtc_dist_matrix_cutoff_filter12, axis=0)
 
        for res1 in range(num_res):
               for res2 in range(res1, num_res):
@@ -7009,10 +7009,16 @@ def calc_pair_stats(reslist, run_params):
     mut_info_uncert_matrix = zeros((bootstrap_sets, len(reslist),len(reslist),6,6),float32)
     dKLtot_dresi_dresj_matrix = zeros((bootstrap_sets, len(reslist),len(reslist)),float32)
     Counts_ij = zeros((bootstrap_sets,rp.nbins,rp.nbins),float64)
-    twoD_hist_boot_avg = zeros((len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
-    twoD_hist_boots = zeros((bootstrap_sets,len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
-    twoD_hist_ind_boot_avg = zeros((len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
-    twoD_hist_ind_boots = zeros((bootstrap_sets,len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
+    if(run_params.plot_2d_histograms == True):
+           twoD_hist_boot_avg = zeros((len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
+           twoD_hist_boots = zeros((bootstrap_sets,len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
+           twoD_hist_ind_boot_avg = zeros((len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
+           twoD_hist_ind_boots = zeros((bootstrap_sets,len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
+    else:
+           twoD_hist_boots_avg = 0 #dummy value
+           twoD_hist_boots = 0 #dummy value
+           twoD_hist_ind_boot_avg = 0
+           twoD_hist_ind_boots = 0
     numangles_bootstrap_nbins_nbins = zeros((bootstrap_sets,rp.nbins,rp.nbins))
     #Loop over the residue list
     print
@@ -7085,14 +7091,15 @@ def calc_pair_stats(reslist, run_params):
                      mut_info_uncert_matrix[:,res_ind1, res_ind2, mychi1, mychi2] = var_mi_thisdof
                      mut_info_res_matrix_different_sims[:,res_ind1, res_ind2, mychi1, mychi2] = mutinf_thisdof_different_sims
                      mut_info_norm_res_matrix[:,res_ind1 , res_ind2, mychi1, mychi2] = MI_norm
-                     twoD_hist_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij / numangles_bootstrap_nbins_nbins
-                     twoD_hist_boots[:,res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
-                     twoD_hist_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0)
-                     twoD_hist_boot_avg[res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0) , -2, -1) #symmetric matrix
-                     twoD_hist_ind_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij / numangles_bootstrap_nbins_nbins
-                     twoD_hist_ind_boots[:,res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
-                     twoD_hist_ind_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0)
-                     twoD_hist_ind_boot_avg[res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0) , -2, -1) #symmetric matrix
+                     if(options.plot_2d_histograms == True):
+                            twoD_hist_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij / numangles_bootstrap_nbins_nbins
+                            twoD_hist_boots[:,res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
+                            twoD_hist_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0)
+                            twoD_hist_boot_avg[res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0) , -2, -1) #symmetric matrix
+                            twoD_hist_ind_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij / numangles_bootstrap_nbins_nbins
+                            twoD_hist_ind_boots[:,res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
+                            twoD_hist_ind_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0)
+                            twoD_hist_ind_boot_avg[res_ind1, res_ind2, mychi2, mychi1, :, :] = swapaxes(average(Counts_ij / numangles_bootstrap_nbins_nbins, axis=0) , -2, -1) #symmetric matrix
                      mut_info_res_matrix[:,res_ind2, res_ind1, mychi2, mychi1] = mut_info_res_matrix[:,res_ind1, res_ind2, mychi1, mychi2]
                      mut_info_uncert_matrix[:,res_ind2, res_ind1, mychi2, mychi1] = mut_info_uncert_matrix[:,res_ind1, res_ind2, mychi1, mychi2]
                      max_S = 0
@@ -7115,14 +7122,15 @@ def calc_pair_stats(reslist, run_params):
                      mut_info_res_matrix_different_sims[:,res_ind1, res_ind2, mychi1, mychi2] = mutinf_thisdof_different_sims
                      mut_info_norm_res_matrix[:,res_ind1 , res_ind2, mychi1, mychi2] = MI_norm
                      print "shape of Counts_ij:"+str(shape(Counts_ij))
-                     twoD_hist_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins , axis=0)
-                     twoD_hist_boot_avg[res_ind2, res_ind1, mychi2, mychi1, :, :] =average(swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1), axis=0)  #symmetric matrix
-                     twoD_hist_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij  / numangles_bootstrap_nbins_nbins
-                     twoD_hist_boots[:,res_ind2, res_ind1, mychi2, mychi1, :, :] = swapaxes(Counts_ij /numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
-                     twoD_hist_ind_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins , axis=0)
-                     twoD_hist_ind_boot_avg[res_ind2, res_ind1, mychi2, mychi1, :, :] =average(swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1), axis=0)  #symmetric matrix
-                     twoD_hist_ind_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij  / numangles_bootstrap_nbins_nbins
-                     twoD_hist_ind_boots[:,res_ind2, res_ind1, mychi2, mychi1, :, :] = swapaxes(Counts_ij /numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
+                     if(options.plot_2d_histograms == True):
+                            twoD_hist_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins , axis=0)
+                            twoD_hist_boot_avg[res_ind2, res_ind1, mychi2, mychi1, :, :] =average(swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1), axis=0)  #symmetric matrix
+                            twoD_hist_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij  / numangles_bootstrap_nbins_nbins
+                            twoD_hist_boots[:,res_ind2, res_ind1, mychi2, mychi1, :, :] = swapaxes(Counts_ij /numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
+                            twoD_hist_ind_boot_avg[res_ind1, res_ind2, mychi1, mychi2, :, :] = average(Counts_ij / numangles_bootstrap_nbins_nbins , axis=0)
+                            twoD_hist_ind_boot_avg[res_ind2, res_ind1, mychi2, mychi1, :, :] =average(swapaxes(Counts_ij / numangles_bootstrap_nbins_nbins, -2, -1), axis=0)  #symmetric matrix
+                            twoD_hist_ind_boots[:,res_ind1, res_ind2, mychi1, mychi2, :, :] = Counts_ij  / numangles_bootstrap_nbins_nbins
+                            twoD_hist_ind_boots[:,res_ind2, res_ind1, mychi2, mychi1, :, :] = swapaxes(Counts_ij /numangles_bootstrap_nbins_nbins, -2, -1) #symmetric matrix
                      max_S = max([max_S,S])
                      mut_info_res_matrix[:,res_ind2, res_ind1, mychi2, mychi1] = mut_info_res_matrix[:,res_ind1, res_ind2, mychi1, mychi2] #symmetric matrix
                      #mut_info_uncert_matrix[res_ind1, res_ind2] = mut_info_uncert_matrix[res_ind1, res_ind2]
@@ -7136,7 +7144,7 @@ def calc_pair_stats(reslist, run_params):
         
     "mut info res matrix:"
     print mut_info_res_matrix
-    return mut_info_res_matrix, uncorrected_mutinf_thisdof, corrections_mutinf_thisdof, mut_info_uncert_matrix, mut_info_res_matrix_different_sims, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg, twoD_hist_boots, twoD_hist_ind_boots, mut_info_norm_res_matrix
+    return mut_info_res_matrix, uncorrected_mutinf_thisdof, corrections_mutinf_thisdof, mut_info_uncert_matrix, mut_info_res_matrix_different_sims, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg, twoD_hist_boots, twoD_hist_ind_boots, twoD_hist_ind_boot_avg, mut_info_norm_res_matrix
 
 
 
@@ -7546,7 +7554,7 @@ if __name__ == "__main__":
                timescales_chis = output_timescales_chis_avg(prefix+"_avg_over_chis_implied_timescales_bootstrap_avg",reslist,name_num_list)
                timescales_chis = output_timescales_chis_max(prefix+"_avg_over_chis_implied_timescales_bootstrap_max",reslist,name_num_list)
                timescales_chis = output_timescales_chis_last(prefix+"_avg_over_chis_implied_timescales_bootstrap_last",reslist,name_num_list)
-               mut_info_res_matrix, uncorrected_mutinf_thisdof, corrections_mutinf_thisdof, mut_info_uncert_matrix, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg, twoD_hist_boots, twoD_hist_ind_boots, mut_info_norm_res_matrix = calc_pair_stats(reslist, run_params)
+               mut_info_res_matrix, uncorrected_mutinf_thisdof, corrections_mutinf_thisdof, mut_info_uncert_matrix, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg, twoD_hist_boots, twoD_hist_ind_boots, twoD_hist_ind_boot_avg, mut_info_norm_res_matrix = calc_pair_stats(reslist, run_params)
                #timescales_mutinf_autocorr = output_timescales_mutinf_autocorr_chis_max(prefix+"_chis_mutinf_autocorr_time_bootstrap_max",reslist,name_num_list)
                timescales_angles_autocorr = output_timescales_angles_autocorr_chis(prefix+"_chis_angles_autocorr_time_bootstrap_max",reslist,name_num_list)
                print "TIME to calculate pair stats: ", timer
@@ -7596,7 +7604,7 @@ if __name__ == "__main__":
            #timescales_mutinf_autocorr = output_timescales_mutinf_autocorr_chis_max(prefix+"_chis_mutinf_autocorr_time_bootstrap_max",reslist,name_num_list)
            timescales_angles_autocorr = output_timescales_angles_autocorr_chis(prefix+"_chis_angles_autocorr_time_bootstrap_max",reslist,name_num_list)
            if run_params.load_matrices_numstructs == 0:
-               mut_info_res_matrix, uncorrected_mutinf_thisdof, corrections_mutinf_thisdof, mut_info_uncert_matrix, mut_info_res_matrix_different_sims, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg, twoD_hist_boots, twoD_hist_ind_boots, mut_info_norm_res_matrix = calc_pair_stats(reslist, run_params)
+               mut_info_res_matrix, uncorrected_mutinf_thisdof, corrections_mutinf_thisdof, mut_info_uncert_matrix, mut_info_res_matrix_different_sims, dKLtot_dresi_dresj_matrix, twoD_hist_boot_avg, twoD_hist_boots, twoD_hist_ind_boots, twoD_hist_ind_boot_avg, mut_info_norm_res_matrix = calc_pair_stats(reslist, run_params)
            print mut_info_res_matrix
            print "TIME to calculate pair stats: ", timer
            timer=utils.Timer()
@@ -7950,10 +7958,11 @@ if __name__ == "__main__":
          output_matrix(prefix+"_bootstrap_avg_mutinf_res_symmetrized_sum_0diag.txt",  mut_info_res_sumoverchis_matrix_avg_symmetrized ,short_name_num_list,short_name_num_list, zero_diag=True)
          print "twoD hist boot avg shape: " + str(twoD_hist_boot_avg.shape )                                                             
          #### Uncomment this for interactive visualization of 2D hists
-         output_matrix_chis_2dhists(prefix+"_bootstrap_avg_2d_hists.txt",     twoD_hist_boot_avg, name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
-         for mybootstrap in range(len(run_params.which_runs)):
-                output_matrix_chis_2dhists(prefix+"_bootstrap_"+str(mybootstrap)+"_2d_hists.txt",     twoD_hist_boots[mybootstrap], name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
-                output_matrix_chis_2dhists(prefix+"_bootstrap_"+str(mybootstrap)+"_independent_markov_2d_hists.txt",     twoD_hist_ind_boots[mybootstrap], name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
+         if(run_params.plot_2d_histograms == True):
+                output_matrix_chis_2dhists(prefix+"_bootstrap_avg_2d_hists.txt",     twoD_hist_boot_avg, name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
+                for mybootstrap in range(len(run_params.which_runs)):
+                       output_matrix_chis_2dhists(prefix+"_bootstrap_"+str(mybootstrap)+"_2d_hists.txt",     twoD_hist_boots[mybootstrap], name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
+                       output_matrix_chis_2dhists(prefix+"_bootstrap_"+str(mybootstrap)+"_independent_markov_2d_hists.txt",     twoD_hist_ind_boots[mybootstrap], name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
          ####
          #output_matrix(prefix+"_bootstrap_avg_KLdivpert_res_0diag.txt",     Kullback_Leibler_local_covar_avg,name_num_list,name_num_list, zero_diag=True)
 
@@ -7962,6 +7971,12 @@ if __name__ == "__main__":
          output_diag(prefix+"_bootstrap_sigavg_entropy_res.txt",mut_info_res_matrix_avg,name_num_list)
          output_diag(prefix+"_bootstrap_sigavg_entropy_res_uncert.txt",mut_info_uncert_matrix_avg,name_num_list)
 
+
+    #clean up stuff
+    del twoD_hist_boot_avg
+    del twoD_hist_boots
+    del twoD_hist_ind_boot_avg
+    del twoD_hist_ind_boots
 
     ########################################################
     #######  RUN TRIPLET STATS  ############################
@@ -8020,8 +8035,8 @@ if __name__ == "__main__":
                                    my_2nd_order_1_2 = mut_info_res_matrix[:,i,j,l,m]    
                                    my_2nd_order_1_3 = mut_info_res_matrix[:,i,k,l,n]    
                                    my_2nd_order_2_3 = mut_info_res_matrix[:,j,k,m,n]    
-                                   mysig_2nd_order=zeros(my_2nd_order.shape, bool)
-                                   for mybootstrap in range(my_2nd_order.shape[0]):
+                                   mysig_2nd_order=zeros(my_2nd_order_1_2.shape, bool)
+                                   for mybootstrap in range(my_2nd_order_1_2.shape[0]):
                                           mysig_2nd_order[mybootstrap] = (my_2nd_order_1_2[mybootstrap] > 0 ) or (my_2nd_order_1_3[mybootstrap] > 0 ) or (my_2nd_order_2_3[mybootstrap] > 0)     
                                    number_sig[mysig_2nd_order == True] += 1   
                                    mut_info_triplet_res_matrix_sig_05[:,i,j,k,l,m,n] = mutinf_boots.copy()
@@ -8033,8 +8048,8 @@ if __name__ == "__main__":
                                   my_2nd_order_1_2 = mut_info_res_matrix[:,i,j,l,m]    
                                   my_2nd_order_1_3 = mut_info_res_matrix[:,i,k,l,n]    
                                   my_2nd_order_2_3 = mut_info_res_matrix[:,j,k,m,n]    
-                                  mysig_2nd_order=zeros(my_2nd_order.shape, bool) 
-                                  for mybootstrap in range(my_2nd_order.shape[0]):
+                                  mysig_2nd_order=zeros(my_2nd_order_1_2.shape, bool) 
+                                  for mybootstrap in range(my_2nd_order_1_2.shape[0]):
                                           mysig_2nd_order[mybootstrap] = (my_2nd_order_1_2[mybootstrap] > 0 ) or (my_2nd_order_1_2[mybootstrap] > 0 ) or (my_2nd_order_1_2[mybootstrap] > 0)     
 
                                   number_sig[mysig_2nd_order == True] += 1   

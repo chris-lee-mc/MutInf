@@ -7956,9 +7956,10 @@ if __name__ == "__main__":
          output_matrix(prefix+"_bootstrap_sigmax01_mutinf_res_0diag.txt",     mut_info_res_sumoverchis_matrix_max_sig01,name_num_list,name_num_list, zero_diag=True)
          
          output_matrix(prefix+"_bootstrap_avg_mutinf_res_symmetrized_sum_0diag.txt",  mut_info_res_sumoverchis_matrix_avg_symmetrized ,short_name_num_list,short_name_num_list, zero_diag=True)
-         print "twoD hist boot avg shape: " + str(twoD_hist_boot_avg.shape )                                                             
+         
          #### Uncomment this for interactive visualization of 2D hists
          if(run_params.plot_2d_histograms == True):
+                print "twoD hist boot avg shape: " + str(twoD_hist_boot_avg.shape )                                                             
                 output_matrix_chis_2dhists(prefix+"_bootstrap_avg_2d_hists.txt",     twoD_hist_boot_avg, name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)
                 for mybootstrap in range(len(run_params.which_runs)):
                        output_matrix_chis_2dhists(prefix+"_bootstrap_"+str(mybootstrap)+"_2d_hists.txt",     twoD_hist_boots[mybootstrap], name_num_list, name_num_list, nchi=6, nbins = run_params.nbins, zero_diag=True)

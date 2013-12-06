@@ -7015,7 +7015,7 @@ def calc_pair_stats(reslist, run_params):
            twoD_hist_ind_boot_avg = zeros((len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
            twoD_hist_ind_boots = zeros((bootstrap_sets,len(reslist),len(reslist),6,6,rp.nbins,rp.nbins),float32) #big matrix of 2D populations sum over bootstraps
     else:
-           twoD_hist_boots_avg = 0 #dummy value
+           twoD_hist_boot_avg = 0 #dummy value
            twoD_hist_boots = 0 #dummy value
            twoD_hist_ind_boot_avg = 0
            twoD_hist_ind_boots = 0

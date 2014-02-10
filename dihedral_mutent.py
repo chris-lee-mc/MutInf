@@ -1582,8 +1582,17 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
     global OUTPUT_INDEPENDENT_MUTINF_VALUES
     # allocate the matrices the first time only for speed
     
-    
-    
+    markov_interval = zeros((bootstrap_sets),int16)
+    # allocate the matrices the first time only for speed
+    if(markov_samples > 0 and bins1_slowest_lagtime != None and bins2_slowest_lagtime != None ):
+           for bootstrap in range(bootstrap_sets):
+                  max_lagtime = max(bins1_slowest_lagtime[bootstrap], bins2_slowest_lagtime[bootstrap] )
+                  markov_interval[bootstrap] = int(max_num_angles / max_lagtime) #interval for final mutual information calc, based on max lagtime
+    else:
+           markov_interval[:] = 1
+
+    print "markov_interval :"
+    print markov_interval
     #ninj_prior = 1.0 / float64(nbins*nbins) #Perks' Dirichlet prior
     #ni_prior = nbins * ninj_prior           #Perks' Dirichlet prior
     ninj_prior = 1.0                        #Uniform prior
@@ -1767,7 +1776,159 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
         }
        }
       """
+
+    code_markov_interval = """
+    // weave6_markov
+    // bins dimensions: bootstrap_sets * markov_samples * bootstrap_choose * max_num_angles
+     #include <math.h>
+
+  
+     double weight;
+     int angle1_bin = 0;
+     int angle2_bin = 0 ;
+     int angle3_bin = 0;
+     int bin1, bin2, bin3 = 0;
+     int mybootstrap, mynumangles,markov_chain,anglenum;
+     //long  offset1, offset2, offset3, offset4;
+     long  counts1, counts2, counts12;
+     double counts1d, counts2d, counts12d;
+     double dig1, dig2;
+     double mysign1, mysign2 = 0 ;
+     for(mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
+      mynumangles = 0;
+      mynumangles = *(numangles_bootstrap + mybootstrap);  // original data went in using each sim separately using which_sims and simnum, but is read on a per-bootstrap basis
+      //printf("mynumangles: %i ", mynumangles);
+      //offset1 = mybootstrap*markov_samples*bootstrap_choose*max_num_angles;
+      //offset2 = mybootstrap*(markov_samples)*nbins; 
+      //offset3 = mybootstrap*(markov_samples)*nbins*nbins ;
+ 
+      #pragma omp parallel for private(markov_chain,anglenum, angle1_bin, angle2_bin, angle3_bin, counts1, counts2, mysign1, mysign2, bin1, bin2, dig1, dig2, counts1d, counts2d, counts12, counts12d) 
+      for (markov_chain=0; markov_chain < markov_samples ; markov_chain++) {
+        
+          for (anglenum=0; anglenum< mynumangles; anglenum++) {
+             //if(anglenum == mynumangles - 1) {
+             //  printf("");  // just to make sure memory writes complete before we proceed
+             //}  
+       
+             // python: self.bins_markov = zeros((self.nchi, bootstrap_sets, self.markov_samples, bootstrap_choose * max_num_angles ), int8)  --- but with chi already dereferenced :  the bin for each dihedral
+             // python: self.chi_counts_markov=zeros((self.nchi, bootstrap_sets, self.markov_samples, nbins), float64) --- but with chi already dereferenced   : since these can be weighted in advanced sampling like replica exchange
+             if(anglenum % markov_interval[mybootstrap] == 0) {
+
+              angle1_bin = *(bins1  +  (long)(mybootstrap*markov_samples*bootstrap_choose*max_num_angles  + markov_chain*bootstrap_choose*max_num_angles +  anglenum));
+              angle2_bin = *(bins2  +  (long)(mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles +  anglenum));
+        
+              
+              *(count_matrix_markov  + (long)(mybootstrap*(markov_samples)*nbins*nbins  +  markov_chain*nbins*nbins  +  angle1_bin*nbins +   angle2_bin )) += 1.0 ;  //* weight * weight;
+             }
+             
+          }
+          
+
+         for(bin1=0; bin1 < nbins; bin1++) 
+          { 
+           for(bin2=0; bin2 < nbins; bin2++)
+           {
+         
+          // ent1_boots = sum((chi_counts1_markov * 1.0 / numangles_bootstrap) * (log(numangles_bootstrap) - special.psi(chi_counts1_markov + SMALL) - ((-1) ** (chi_counts1_markov % 2)) / (chi_counts1_markov + 1.0)),axis=2)
+           counts12 = *(count_matrix_markov  + (long)( mybootstrap*(markov_samples)*nbins*nbins   +  markov_chain*nbins*nbins  +  bin1*nbins + bin2 ));
+ 
+           if(counts12 > 0)
+           {
+            mysign1 = 1.0L - 2*(counts12 % 2); // == -1 if it is odd, 1 if it is even
+            dig1 = xDiGamma_Function(counts12);
+           
+           
+           counts12d = 1.0 * counts12;
+           *(ent_1_2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts12d / mynumangles)*(log(mynumangles) - dig1 - ((double)mysign1 / ((double)(counts12 + 1.0)))); 
+           }
+          }
+         }
+       
     
+
+        }
+       }
+      """
+
+
+    code_markov_interval_singlets = """
+    // weave6_markov
+    // bins dimensions: bootstrap_sets * markov_samples * bootstrap_choose * max_num_angles
+     #include <math.h>
+
+  
+     double weight;
+     int angle1_bin = 0;
+     int angle2_bin = 0 ;
+     int angle3_bin = 0;
+     int bin1, bin2, bin3 = 0;
+     int mybootstrap, mynumangles,markov_chain,anglenum;
+     //long  offset1, offset2, offset3, offset4;
+     long  counts1, counts2, counts12;
+     double counts1d, counts2d, counts12d;
+     double dig1, dig2;
+     double mysign1, mysign2 = 0 ;
+     for(mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
+      mynumangles = 0;
+      mynumangles = *(numangles_bootstrap + mybootstrap);  // original data went in using each sim separately using which_sims and simnum, but is read on a per-bootstrap basis
+      //printf("mynumangles: %i ", mynumangles);
+      //offset1 = mybootstrap*markov_samples*bootstrap_choose*max_num_angles;
+      //offset2 = mybootstrap*(markov_samples)*nbins; 
+      //offset3 = mybootstrap*(markov_samples)*nbins*nbins ;
+ 
+      #pragma omp parallel for private(markov_chain,anglenum, angle1_bin, angle2_bin, angle3_bin, counts1, counts2, mysign1, mysign2, bin1, bin2, dig1, dig2, counts1d, counts2d, counts12, counts12d) 
+      for (markov_chain=0; markov_chain < markov_samples ; markov_chain++) {
+
+          // now actually compute the entropies for each order to be combined later
+            
+          for(bin1=0; bin1 < nbins; bin1++) 
+           { 
+             if(markov_interval[mybootstrap] < 2) {
+              counts1 = int(*(chi_counts1_markov  + (long)( mybootstrap*markov_samples*nbins   +  markov_chain*nbins  +  bin1  )));
+             }
+             else {
+              counts1 = 0;
+              for(bin2=0; bin2 < nbins; bin2++) {
+               counts1 += *(count_matrix_markov  + (long)(mybootstrap*(markov_samples)*nbins*nbins  +  markov_chain*nbins*nbins    +  bin1*nbins + bin2));
+              }
+             }
+   
+              if(counts1 > 0)
+              {
+                mysign1 = 1.0L - 2*(counts1 % 2); // == -1 if it is odd, 1 if it is even
+                dig1 = xDiGamma_Function(counts1);
+                
+                
+                counts1d = 1.0 * counts1;
+                *(ent1_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts1d / mynumangles)*(log(mynumangles) - dig1 - ((double)mysign1 / ((double)(counts1 + 1.0)))); 
+              }
+
+             if(markov_interval[mybootstrap] < 2) {
+               counts2 = int(*(chi_counts2_markov  + (long)( mybootstrap*markov_samples*nbins   +  markov_chain*nbins  +  bin1  )));
+             }
+             else {
+               counts2 = 0;
+               for(bin2=0; bin2 < nbins; bin2++) {
+                counts2 += *(count_matrix_markov  + (long)(mybootstrap*(markov_samples)*nbins*nbins  +  markov_chain*nbins*nbins +  bin2*nbins + bin1));
+              }
+             }
+
+ 
+              if(counts2 > 0)
+              {
+                mysign2 = 1.0L - 2*(counts2 % 2); // == -1 if it is odd, 1 if it is even
+                dig2 = xDiGamma_Function(counts2);
+                
+                
+                counts2d = 1.0 * counts2;
+                *(ent2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts2d / mynumangles)*(log(mynumangles) - dig2 - ((double)mysign2 / ((double)(counts2 + 1.0)))); 
+              }
+         }
+      } 
+     }
+     """
+
+
     #this old code used to be under the loop over markov_samples in the above code snippet, but the functionality has been migrated to markov 1D sampling
     old_code = """
        for(bin1=0; bin1 < nbins; bin1++) 
@@ -1852,10 +2013,19 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
     print chi_counts1_markov
     print "chi counts2_markov:"
     print chi_counts2_markov
-    weave.inline(code, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','chi_counts1_markov','chi_counts2_markov'],
+    weave.inline(code, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','chi_counts1_markov','chi_counts2_markov','markov_interval'],
                  #type_converters = converters.blitz,
                  compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler] ,
                  support_code=my_support_code )
+    #weave.inline(code_markov_interval, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','chi_counts1_markov','chi_counts2_markov','markov_interval'],
+    #             #type_converters = converters.blitz,
+    #             compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler] ,
+    #             support_code=my_support_code )
+
+    #weave.inline(code_markov_interval_singlets, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','chi_counts1_markov','chi_counts2_markov','markov_interval'],
+    #             #type_converters = converters.blitz,
+    #             compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler] ,
+    #             support_code=my_support_code )
 
     code2 = """
     // weave6_markov
@@ -1978,12 +2148,12 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
         #ent1_boots = sum((chi_counts1_markov_vector * 1.0 / numangles_bootstrap_vector) * (log(numangles_bootstrap_vector) - special.psi(chi_counts1_markov_vector + SMALL) - (1 - 2*(chi_counts1_markov_vector % 2)) / (chi_counts1_markov_vector + 1.0)),axis=2)
 
         #ent2_boots = sum((chi_counts2_markov_vector * 1.0 / numangles_bootstrap_vector) * (log(numangles_bootstrap_vector) - special.psi(chi_counts2_markov_vector + SMALL) - (1 - 2*(chi_counts2_markov_vector % 2)) / (chi_counts2_markov_vector + 1.0)),axis=2)
-        #print "ent1_boots:         : "+str(ent1_boots)
-        #print "ent1_boots from init: "+str(ent1_markov_boots)
+        print "ent1_boots:         : "+str(ent1_boots)
+        print "ent1_boots from init: "+str(ent1_markov_boots)
         #print "chi_counts1_markov_vector bootstrap 0: "+str(chi_counts1_markov_vector[0])
         #print "ent1 old  : "+str(sum((chi_counts1_markov_vector * 1.0 / numangles_bootstrap_vector) * (log(numangles_bootstrap_vector) - special.psi(chi_counts1_markov_vector + SMALL) - (1.0 - 2*(int64(chi_counts1_markov_vector) % 2)) / (chi_counts1_markov_vector + 1.0)),axis=2))
-        #print "ent2_boots: "+str(ent2_boots)
-        #print "ent2_boots from init: "+str(ent2_markov_boots)
+        print "ent2_boots: "+str(ent2_boots)
+        print "ent2_boots from init: "+str(ent2_markov_boots)
         #print "chi_counts2_markov_vector bootstrap 0: "+str(chi_counts2_markov_vector[0])
         #print "ent2 old  : "+str(sum((chi_counts2_markov_vector * 1.0 / numangles_bootstrap_vector) * (log(numangles_bootstrap_vector) - special.psi(chi_counts2_markov_vector + SMALL) - (1.0 - 2*(int64(chi_counts2_markov_vector) % 2)) / (chi_counts2_markov_vector + 1.0)),axis=2))
         #print "ent1 terms: "
@@ -2010,9 +2180,13 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
         #                       special.psi(count_matrix_markov + SMALL)  \
         #                       - (1 - 2*(count_matrix_markov % 2)) / (count_matrix_markov + 1.0) \
         #                       ),axis=2))
-        #print "ent1_markov_boots:  "+str(ent1_markov_boots)
-        #print "ent2_markov_boots:  "+str(ent2_markov_boots)
-        #print "ent12_markov_boots: "+str(ent_1_2_boots)
+        print "ent1_markov_boots:  "+str(ent1_markov_boots)
+        print "ent2_markov_boots:  "+str(ent2_markov_boots)
+        print "ent12_markov_boots: "+str(ent_1_2_boots)
+        
+        #if(sum(markov_interval) > bootstrap_sets): #if using markov_interval to subsample data
+        #       mutinf_thisdof = ent1_boots + ent2_boots - ent_1_2_boots
+        #else:
         mutinf_thisdof = ent1_markov_boots + ent2_markov_boots - ent_1_2_boots
     
     E_I = average(mutinf_thisdof)
@@ -2115,8 +2289,20 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
     ni_prior = nbins * ninj_prior           #Uniform prior
     pvalue = zeros((bootstrap_sets),float64)
 
+    markov_interval = zeros((bootstrap_sets),int16)
+    # allocate the matrices the first time only for speed
+    if(markov_samples > 0 and bins1_slowest_lagtime != None and bins2_slowest_lagtime != None ):
+           for bootstrap in range(bootstrap_sets):
+                  max_lagtime = max(bins1_slowest_lagtime[bootstrap], bins2_slowest_lagtime[bootstrap])
+                  markov_interval[bootstrap] = int(max_num_angles / max_lagtime) #interval for final mutual information calc, based on max lagtime
+    else:
+           markov_interval[:] = 1
+
+    markov_interval[:] = 1
     #must be careful to zero discrete histograms that we'll put data in from weaves
     if VERBOSE >= 2:
+           print "markov interval: "
+           print markov_interval
            print "chi counts 1 before multinomial:"
            print chi_counts1
            print "chi counts 2 before multinomial:"
@@ -2215,24 +2401,35 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
      #pragma omp parallel for private(mybootstrap,mynumangles,permut,anglenum,angle1_bin,angle2_bin,weight,bin1, bin2, mysign1, mysign2, mysign12, counts1, counts1d, counts2, counts2d, counts12, counts12d, dig1, dig2, dig12 )
      for( mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
       mynumangles = 0;
-      for (permut=0; permut < permutations + 1; permut++) {
-          mynumangles = *(numangles_bootstrap + mybootstrap);
+      mynumangles = *(numangles_bootstrap + mybootstrap);
+      for (permut=0; permut < permutations + 1; permut++) {          
           for (anglenum=offset; anglenum< mynumangles; anglenum++) {
-          if(mybootstrap == bootstrap_sets - 1) {
-            //printf("bin12 %i \\n",(*(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum))*nbins +   (*(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum)));
-            }
-             angle1_bin = *(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum);
-             angle2_bin = *(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum - offset);
-             weight = *(boot_weights + mybootstrap*bootstrap_choose*max_num_angles + anglenum); //assumes mynumangles same for all dihedrals, for nonzero offsets assumes equal weights
-             *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  angle1_bin*nbins +   angle2_bin ) += 1.0 * weight * weight;
-             
+          //if(mybootstrap == bootstrap_sets - 1) {
+          //  //printf("bin12 %i \\n",(*(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum))*nbins +   (*(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum)));
+          //  }
+           if(anglenum == mynumangles - 1) {
+             printf(""); //just to make sure count matrix values are written to disk before the next loop
+           }
+           //if(anglenum % markov_interval[mybootstrap] == 0) { 
+              angle1_bin = *(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum);
+              angle2_bin = *(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum - offset);
+              weight = *(boot_weights + mybootstrap*bootstrap_choose*max_num_angles + anglenum); //assumes mynumangles same for all dihedrals, for nonzero offsets assumes equal weights
+              *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  angle1_bin*nbins +   angle2_bin ) += 1.0 * weight * weight;
+           //} 
           }
            // do singlet entropies here
            for(bin1=0; bin1 < nbins; bin1++) 
            { 
-            
-             counts1 = int(*(chi_counts1_vector  + (long)( mybootstrap*(permutations + 1)*nbins   +  permut*nbins  +  bin1  )));
- 
+             if(markov_interval[mybootstrap] < 2) {
+              counts1 = int(*(chi_counts1_vector  + (long)( mybootstrap*(permutations + 1)*nbins   +  permut*nbins  +  bin1  )));
+             }
+             else {
+              counts1 = 0;
+              for(bin2=0; bin2 < nbins; bin2++) {
+               counts1 += *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  bin1*nbins + bin2);
+              }
+             }
+   
               if(counts1 > 0)
               {
                 mysign1 = 1.0L - 2*(counts1 % 2); // == -1 if it is odd, 1 if it is even
@@ -2243,7 +2440,15 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
                 *(ent_1_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts1d / mynumangles)*(log(mynumangles) - dig1 - ((double)mysign1 / ((double)(counts1 + 1.0)))); 
               }
 
-             counts2 = int(*(chi_counts2_vector  + (long)( mybootstrap*(permutations + 1)*nbins   +  permut*nbins  +  bin1  )));
+             if(markov_interval[mybootstrap] < 2) {
+               counts2 = int(*(chi_counts2_vector  + (long)( mybootstrap*(permutations + 1)*nbins   +  permut*nbins  +  bin1  )));
+             }
+             else {
+               counts2 = 0;
+               for(bin2=0; bin2 < nbins; bin2++) {
+                counts2 += *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  bin2*nbins + bin1);
+              }
+             }
  
               if(counts2 > 0)
               {
@@ -2285,7 +2490,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
 
     if(VERBOSE >= 2): print "about to populate count_matrix"
     weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
-                 'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots'],
+                 'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots','markov_interval'],
                  compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
                  support_code=my_support_code)
     if (no_boot_weights != False ):
@@ -2536,6 +2741,28 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
            assert(abs(sum(Pij[1:,1:]) - sum(PiPj[1:,1:])) < nbins)
            assert(all(abs(sum(Pij[1:,1:],axis=1) - sum(PiPj[1:,1:],axis=1)) < nbins))
            assert(all(abs(sum(Pij[1:,1:],axis=0) - sum(PiPj[1:,1:],axis=0)) < nbins))
+
+    if permutations > 0:
+           mypermutation = 1
+           Pij[1:,1:]  = (count_matrix[0,mypermutation,:]).reshape((nbins,nbins))
+           PiPj[1:,1:] = (ninj_flat[0,mypermutation,:]).reshape((nbins,nbins)) / (numangles_bootstrap[0] * 1.0)
+           #sanity checks
+           if(VERBOSE >= 1):
+                  print "Third Pass:"
+                  print "Sum Pij: "+str(sum(Pij[1:,1:]))+" Sum PiPj: "+str(sum(PiPj[1:,1:]))
+                  print "Marginal Pij, summed over j:\n"
+                  print sum(Pij[1:,1:],axis=1)
+                  print "Marginal PiPj, summed over j:\n"
+                  print sum(PiPj[1:,1:],axis=1)   
+                  print "Marginal Pij, summed over i:\n"
+                  print sum(Pij[1:,1:],axis=0)
+                  print "Marginal PiPj, summed over i:\n"
+                  print sum(PiPj[1:,1:],axis=0)
+                  #print floor(sum(Pij[1:,1:],axis=1)) == floor(sum(PiPj[1:,1:],axis=1))
+           if(VERBOSE >= 1):
+                  assert(abs(sum(Pij[1:,1:]) - sum(PiPj[1:,1:])) < nbins)
+                  assert(all(abs(sum(Pij[1:,1:],axis=1) - sum(PiPj[1:,1:],axis=1)) < nbins))
+                  assert(all(abs(sum(Pij[1:,1:],axis=0) - sum(PiPj[1:,1:],axis=0)) < nbins))
     
     #now sum over bootstraps for 
     Counts_ij = zeros((bootstrap_sets, nbins, nbins),float64)
@@ -2616,7 +2843,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
            if(VERBOSE >=2):
                   print "Avg Descriptive MI ind:    "+str(average(mutinf_thisdof[:,1:]))
                   print "Number of permutations:    "+str(mutinf_thisdof.shape[1] -1)
-    
+                  print "distribution of MI ind:    "+str((mutinf_thisdof[:,1:]))
     #Now, if permutations==0, filter according to Bayesian estimate of distribution
     # of mutual information, M. Hutter and M. Zaffalon 2004 (or 2005).
     # Here, we will discard those MI values with p(I | data < I*) > 0.05.
@@ -3211,7 +3438,10 @@ def calc_excess_mutinf(chi_counts1, chi_counts2, bins1, bins2, chi_counts_sequen
     #print "tot_mutinfs_diff_sims:"+str(mutinf_tot_thisdof_different_sims)
     uncorrected_mutinf_thisdof = mutinf_tot_thisdof[:,0]
     
-    if(sigalpha < 1.0): #if we're doing statistics at all...
+    if(markov_samples == 0):
+        excess_mutinf_thisdof = mutinf_tot_thisdof[:,0] #no correction to mutinf value for markov model
+        corrections_mutinf_thisdof  += independent_mutinf_thisdof
+    elif(sigalpha < 1.0): #if we're doing statistics at all...
         excess_mutinf_thisdof = mutinf_tot_thisdof[:,0] - independent_mutinf_thisdof
         corrections_mutinf_thisdof  += independent_mutinf_thisdof
     else:
@@ -3226,7 +3456,11 @@ def calc_excess_mutinf(chi_counts1, chi_counts2, bins1, bins2, chi_counts_sequen
     #print "nonneg excess thisdof: "+str(nonneg_excess_thisdof)
     old_excess_mutinf_thisdof = excess_mutinf_thisdof.copy()
     excess_mutinf_thisdof_different_sims += sd_ind_different_sims  #adding back the cutoff value
-    excess_mutinf_thisdof[nonneg_excess_thisdof] -= excess_mutinf_thisdof_different_sims[nonneg_excess_thisdof] # subtract out high-pass-filtered mutinf for torsions in different sims
+    
+    #only do this next step if markov model is not used
+    if(markov_samples == 0):
+           excess_mutinf_thisdof[nonneg_excess_thisdof] -= excess_mutinf_thisdof_different_sims[nonneg_excess_thisdof] # subtract out high-pass-filtered mutinf for torsions in different sims
+           
     #remember to zero out the excess mutinf thisdof from different sims that were below the cutoff value
     excess_mutinf_thisdof_different_sims[excess_mutinf_thisdof_different_sims <= sd_ind_different_sims ] = 0
     #print "corrected excess_mutinfs:"+str(excess_mutinf_thisdof)
@@ -3296,6 +3530,7 @@ NumChis = { "ALA":0, "CYS":1, "CYN":1, "CYX":2, "CY2":2, "CYM":1, "ASP":2, "AS4"
             "CALA":0, "CCYS":1, "CCYN":1, "CCYX":1, "CCY2":2, "CASP":2, "CAS4":2, "CASH":2, "CGLU":3, "CGL4": 3, "CGLH":3, "CPHE":2, 
             "CGLY":0, "CHIS":2, "CHIP":2, "CHIE":2, "CHID":2, "CILE":2, "CLYS":4, "CLYP":4, "CLEU":2, "CMET":3, "CASN":2, "CGLN":3,
             "CPRO":1, "CARG":4, "CSER":2, "CTHR":2, "CVAL":1,"CTRP":2, "CTYR":2,
+            "PHI":1,"PSI":1 #these last two are for treating phi and psi as belonging to different residues for alanine tripeptide for example
             } 
 
 #next is for pdb trajectories -- no -OH chis
@@ -4608,8 +4843,8 @@ class ResidueChis:
                  #self.boot_sorted_angles[chi_num,bootstrap,:]
                  #boot_angles[boot_sim_num,:self.numangles[sequential_sim_num]]= self.angles[chi_num, self.which_runs[bootstrap,boot_sim_num], :self.numangles[sequential_sim_num]]
                  #boot_weights[boot_sim_num,:self.numangles[sequential_sim_num]]= self.weights[self.which_runs[bootstrap,boot_sim_num], :self.numangles[sequential_sim_num]]
-                 boot_angles[boot_sim_num,:min_num_angles]= self.angles[chi_num, self.which_runs[bootstrap,boot_sim_num], :convergence_interval]
-                 boot_weights[boot_sim_num,:min_num_angles]= self.weights[self.which_runs[bootstrap,boot_sim_num], :convergence_interval]   
+                 boot_angles[boot_sim_num,:convergence_interval]= self.angles[chi_num, self.which_runs[bootstrap,boot_sim_num], :convergence_interval]
+                 boot_weights[boot_sim_num,:convergence_interval]= self.weights[self.which_runs[bootstrap,boot_sim_num], :convergence_interval]   
              # resize for sorting so the extra angle slots go into axis 0 and so will appear after all the data
              boot_flat = resize(swapaxes(boot_angles,0,1),(boot_numangles))
              boot_weights_flat = resize(swapaxes(boot_weights,0,1),(boot_numangles))
@@ -4635,7 +4870,7 @@ class ResidueChis:
    def __init__(self,myname,mynum,mychain,xvg_resnum,basedir,num_sims,max_angles,xvgorpdb,binwidth,sigalpha=1,
                 permutations=0,phipsi=0,backbone_only=0,adaptive_partitioning=0,which_runs=None,pair_runs=None,bootstrap_choose=3,
                 calc_variance=False, all_angle_info=None, xvg_chidir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0, last_step=None, calc_mutinf_between_sims="yes", max_num_chis=99,
-                sequential_res_num = 0, pdbfile = None, xtcfile = None, output_timeseries = "no", minmax=None, bailout_early = False, lagtime_interval = None, markov_samples = 250, num_convergence_points=1):
+                sequential_res_num = 0, pdbfile = None, xtcfile = None, output_timeseries = "no", minmax=None, bailout_early = False, lagtime_interval = None, markov_samples = 250, num_convergence_points=1, cyclic_permut=False):
       global xtc_coords 
       global last_good_numangles # last good value for number of dihedrals
       global NumChis, NumChis_Safe
@@ -5853,6 +6088,7 @@ class ResidueChis:
        {
         for(mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) 
         {  
+           
            #pragma omp parallel for private(markov_chain, mynumangles, mynumangles_sum, mysim, simnum, lagtime, anglenum, bin1, offset, myrand, mycdf, bin2)
            for (markov_chain = 0; markov_chain < markov_samples; markov_chain++) 
            {
@@ -5915,12 +6151,15 @@ class ResidueChis:
                            
                         }
                         // python: self.bins_markov = zeros((self.nchi, bootstrap_sets, self.markov_samples, bootstrap_choose * max_num_angles ), int8) # the bin for each dihedral
-                        offset = (unsigned long long )(mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + mysim*max_num_angles + anglenum) ;
-                        //*(bins_markov +  mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + mynumangles_sum + anglenum) = bin1;   // will be overwritten if anglenum is a multiple of the lagtime ... this is just to avoid another branch
+
+                        //if(anglenum % lagtime == 0) {   // then record the data  (markov_interval)
+                          offset = (unsigned long long )(mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + mysim*max_num_angles + anglenum) ;
+                          //*(bins_markov +  mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + mynumangles_sum + anglenum) = bin1;   // will be overwritten if anglenum is a multiple of the lagtime ... this is just to avoid another branch
                         
-                        *(bins_markov + mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + mynumangles_sum + anglenum ) = bin1;   // will be overwritten if anglenum is a multiple of the lagtime ... this is just to avoid another branch
-                        // python: self.chi_counts_markov=zeros((bootstrap_sets, self.markov_samples, self.nchi, nbins), float64)  since these can be weighted in advanced sampling like replica exchange
-                        *(chi_counts_markov + (long)(mychi*bootstrap_sets*markov_samples*nbins + mybootstrap*markov_samples*nbins + markov_chain*nbins + bin1)) += 1 ;  
+                          *(bins_markov + mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + mynumangles_sum + anglenum ) = bin1;   // will be overwritten if anglenum is a multiple of the lagtime ... this is just to avoid another branch
+                          // python: self.chi_counts_markov=zeros((bootstrap_sets, self.markov_samples, self.nchi, nbins), float64)  since these can be weighted in advanced sampling like replica exchange
+                          *(chi_counts_markov + (long)(mychi*bootstrap_sets*markov_samples*nbins + mybootstrap*markov_samples*nbins + markov_chain*nbins + bin1)) += 1 ;  
+                         //}
                     }
               mynumangles_sum += mynumangles; //increment for next iteration
               //printf("mysim: %i mynumangles_sum: %i mynumangles: %i max_num_angles: %i \\n", mysim, mynumangles_sum, mynumangles, max_num_angles);
@@ -5933,6 +6172,7 @@ class ResidueChis:
 
        for(mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) 
        {        
+           //lagtime = *(slowest_lagtime + mychi*bootstrap_sets + mybootstrap);
            #pragma omp parallel for private(markov_chain, mynumangles_sum, mysim, simnum, mynumangles, anglenum, counts, lagtime, bin1,  myrand, mycdf, mysign1, counts1d, dig1)
            for (markov_chain = 0; markov_chain < markov_samples; markov_chain++) 
            {        
@@ -5950,10 +6190,12 @@ class ResidueChis:
                 mynumangles_sum += mynumangles;
               }
                 for (anglenum=0; anglenum< mynumangles_sum; anglenum++) {
+                 //if(anglenum % lagtime == 0) {   // then read data from the discrete markov step (markov interval)
                   // anglenum goes up to mynumangles_sum, so no extra index for anglenum here
                   bin1 = *(bins_markov + (long )(mychi*bootstrap_sets*markov_samples*bootstrap_choose*max_num_angles +  mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles + anglenum));
                   //printf("anglenum: %i bin1: %i\\n", anglenum, bin1);
                   temp_counts[markov_chain][bin1] += 1;
+                 //}
               }
               for (bin1 = 0; bin1 < nbins; bin1++)
               {  
@@ -6504,17 +6746,39 @@ class ResidueChis:
              print "shape of self.numangles"
              print shape(self.numangles)
       
-
+             
       for myscramble in range(self.permutations + 1):
           for mychi in range(self.nchi):
              if (myscramble == 1): #resize
                  for bootstrap in range(bootstrap_sets):
-                     self.bins[mychi, :, bootstrap, :] = self.bins[mychi, 0, bootstrap, :] #replicate data
+                     self.bins[mychi, :, bootstrap, :] = self.bins[mychi, 0, bootstrap, :] #replicate data in preparation for scrambling or cyclicly permuting
                  for sequential_sim_num in range(num_sims):
                       self.simbins[mychi, :, sequential_sim_num, :] = self.simbins[mychi, 0, sequential_sim_num, :]
              if(myscramble > 0):
                  for bootstrap in range(bootstrap_sets): 
-                      random.shuffle(self.bins[mychi, myscramble, bootstrap, :numangles_bootstrap[bootstrap]])  #only shuffle up to number of angles in this bootstrap -- for num_convergence_points > 1
+                      if(cyclic_permut == False):  
+                             print "shuffling for calculation of independent information"
+                             random.shuffle(self.bins[mychi, myscramble, bootstrap, :numangles_bootstrap[bootstrap]])  #only shuffle up to number of angles in this bootstrap -- for num_convergence_points > 1
+                      else:
+                             print "doing cyclic permutations" #will offset by more than one block 
+                             #if(num_convergence_points == 1):
+                             if(True):
+                                    numangles_per_boot = int(numangles_bootstrap[bootstrap] / bootstrap_choose)
+                             
+                                    print "numangles per sim in each bootstrap: "+str(numangles_per_boot)
+                                    print "bootstrap choose:                    "+str(bootstrap_choose)
+                                    print "shape of temp array:                 "+str(shape(self.bins[mychi,myscramble,bootstrap]))
+                                    tempbins = reshape(self.bins[mychi,myscramble,bootstrap,:numangles_bootstrap[bootstrap]], (bootstrap_choose, numangles_per_boot)) #prepare for cyclic permutation
+                                    tempbins = roll(tempbins,myscramble + 1 ,axis=0) # do cyclic permutation .. will be redundant if myscramble  > bootstrap_choose
+                                    self.bins[mychi, myscramble, bootstrap, :numangles_bootstrap[bootstrap]] = reshape(tempbins, (bootstrap_choose * numangles_per_boot ))
+                             else:
+                                    numangles_per_sim = numangles[bootstrap, 0] #use sim zero since all will have the same value after the above code is run
+                                    print "numangles per sim in each bootstrap: "+str(numangles_per_sim)
+                                    print "num sims  choose:                    "+str(num_sims)
+                                    print "shape of temp array:                 "+str(shape(self.bins[mychi,myscramble,bootstrap,:numangles_bootstrap[bootstrap]]))
+                                    tempbins = reshape(self.bins[mychi,myscramble,bootstrap,:numangles_bootstrap[bootstrap]], (num_sims, numangles_per_sim)) #prepare for cyclic permutation
+                                    tempbins = roll(tempbins,myscramble + 1,axis=0) # do cyclic permutation .. will be redundant if myscramble > bootstrap_choose
+                                    self.bins[mychi, myscramble, bootstrap, :numangles_bootstrap[bootstrap]] = reshape(tempbins, (num_sims * numangles_per_sim ))
                  for sequential_sim_num in range(num_sims):
                      random.shuffle(self.simbins[mychi, myscramble, sequential_sim_num, :numangles_bootstrap[bootstrap]]) #only shuffle up to number of angles in this bootstrap -- for num_convergence_points > 1
              else:             
@@ -6845,6 +7109,9 @@ class ResidueChis:
                               
                print "sampling from transition matrix"
                
+               
+
+
                ent_markov_boots = self.ent_markov_boots
                #this code already has a loop over chi's and bootstraps           
                weave.inline(code_sample_from_transition_matrix_1D_new, ['num_sims', 'numangles','numangles_bootstrap', 'max_num_angles','max_angles','bootstrap_choose', 'nbins', 'bins', 'bootstrap_sets', 'mychi', 'transition_matrix', 'lagtime_interval','which_runs','markov_samples', 'chi_counts_markov', 'nchi', 'bins_markov', 'slowest_lagtime', 'ent_markov_boots', 'permutations' ],
@@ -7041,7 +7308,7 @@ def calc_pair_stats(reslist, run_params):
                  mutinf_thisdof = var_mi_thisdof = mutinf_thisdof_different_sims = dKLtot_dKL1_dKL2 = MI_norm = 0 #initialize
                  angle_str = ("%s_chi%d-%s_chi%d"%(myres1, mychi1+1, myres2, mychi2+1)).replace(" ","_")
                  if(VERBOSE >=2):
-                        print "twoD hist boot avg shape: " + str(twoD_hist_boot_avg.shape ) 
+                        #print "twoD hist boot avg shape: " + str(twoD_hist_boot_avg.shape ) 
                         print "ent1_markov_boots:        " + str(myres1.ent_markov_boots[mychi1,:,:])
                         print "ent2_markov_boots:        " + str(myres2.ent_markov_boots[mychi2,:,:])
                  if((res_ind1 != res_ind2) or (res_ind1 == res_ind2 and mychi1 > mychi2)):
@@ -7077,7 +7344,9 @@ def calc_pair_stats(reslist, run_params):
                      print "mutinf this dof:"
                      print mutinf_thisdof
                      if rp.num_convergence_points > 1:
-                            output_mutinf_convergence(str(myres1.name)+str(myres1.num)+"chi"+str(mychi1+1)+"_"+str(myres2.name)+str(myres2.num)+"chi"+str(mychi2+1)+"_convergence.txt", mutinf_thisdof, bootstrap_sets)
+                            output_mutinf_convergence(str(myres1.name)+str(myres1.num)+"chi"+str(mychi1+1)+"_"+str(myres2.name)+str(myres2.num)+"chi"+str(mychi2+1)+"_mutinf_convergence.txt", mutinf_thisdof, bootstrap_sets)
+                            output_mutinf_convergence(str(myres1.name)+str(myres1.num)+"chi"+str(mychi1+1)+"_"+str(myres2.name)+str(myres2.num)+"chi"+str(mychi2+1)+"_uncorrected_convergence.txt", uncorrected_mutinf_thisdof, bootstrap_sets)
+                            output_mutinf_convergence(str(myres1.name)+str(myres1.num)+"chi"+str(mychi1+1)+"_"+str(myres2.name)+str(myres2.num)+"chi"+str(mychi2+1)+"_independent_convergence.txt", corrections_mutinf_thisdof, bootstrap_sets)
                      
                  if(res_ind1 == res_ind2 and mychi1 == mychi2):
                      mut_info_res_matrix[:,res_ind1, res_ind2, mychi1, mychi2] = myres1.entropy[:,mychi1]
@@ -7188,7 +7457,7 @@ def load_resfile(run_params, load_angles=True, all_angle_info=None):
        else:
               res_chain = ""
        if load_angles: 
-              reslist.append(ResidueChis(res_name,res_num, res_chain, xvg_resnum, rp.xvg_basedir, rp.num_sims, rp.num_structs, rp.xvgorpdb, rp.binwidth, rp.sigalpha, rp.permutations, rp.phipsi, rp.backbone_only, rp.adaptive_partitioning, rp.which_runs, rp.pair_runs, bootstrap_choose = rp.bootstrap_choose, calc_variance=rp.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp.xvg_chidir, skip=rp.skip,skip_over_steps=rp.skip_over_steps,last_step=rp.last_step, calc_mutinf_between_sims=rp.calc_mutinf_between_sims,max_num_chis=rp.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp.pdbfile, xtcfile=rp.xtcfile, output_timeseries=rp.output_timeseries, lagtime_interval=rp.lagtime_interval, markov_samples=rp.markov_samples, num_convergence_points=rp.num_convergence_points ))
+              reslist.append(ResidueChis(res_name,res_num, res_chain, xvg_resnum, rp.xvg_basedir, rp.num_sims, rp.num_structs, rp.xvgorpdb, rp.binwidth, rp.sigalpha, rp.permutations, rp.phipsi, rp.backbone_only, rp.adaptive_partitioning, rp.which_runs, rp.pair_runs, bootstrap_choose = rp.bootstrap_choose, calc_variance=rp.calc_variance, all_angle_info=all_angle_info, xvg_chidir=rp.xvg_chidir, skip=rp.skip,skip_over_steps=rp.skip_over_steps,last_step=rp.last_step, calc_mutinf_between_sims=rp.calc_mutinf_between_sims,max_num_chis=rp.max_num_chis, sequential_res_num = sequential_num, pdbfile=rp.pdbfile, xtcfile=rp.xtcfile, output_timeseries=rp.output_timeseries, lagtime_interval=rp.lagtime_interval, markov_samples=rp.markov_samples, num_convergence_points=rp.num_convergence_points, cyclic_permut = rp.cyclic_permut  ))
        else:  reslist.append(ResListEntry(res_name,res_num,res_chain))
        sequential_num += 1 
     return reslist
@@ -7400,6 +7669,7 @@ if __name__ == "__main__":
     parser.add_option("--output_independent",default = 0, type=int, help="set equal to 1 to output independent mutinf values from markov model or multinomial distribution")
     parser.add_option("-C","--num_convergence_points", default = 0, type=int, help="for -n == -o , use this many subsets of the data to look at convergence statistics")   
     parser.add_option("-T","--triplet", default=None, type="string", help="wheter to perform triplet mutual information or not")
+    parser.add_option("-P","--cyclic_permut",default=False, action = "store_true", help="for permutations, cyclicly permute blocks (run1 run2 run3 etc.) instead of scrambling or shuffling")
     (options,args)=parser.parse_args()
     mycompiler = options.gcc
     if len(filter(lambda x: x==None, (options.traj_fns, options.xvg_basedir))) != 1:
@@ -7481,9 +7751,11 @@ if __name__ == "__main__":
         which_runs.append(myruns)
     print which_runs
 
+    if (options.cyclic_permut == True):
+           print "using cyclic permutations instead of scrambling as per Fenley, Muddana, Gilson et al PNAS 2012 "
     if options.num_convergence_points > 1: #create bootstrap samples for number of convergence points, this will also set variables like bootstrap_sets  
            print "looking at mutual information convergence using "+str(options.num_convergence_points)+" convergence points"
-           options.bootstrap_set_size = 1  #override options
+           #options.bootstrap_set_size = 1  #override options
            for convergence_point in range(options.num_convergence_points - 1):
                   which_runs.append(which_runs[0])
 
@@ -7511,7 +7783,7 @@ if __name__ == "__main__":
 
     run_params = RunParameters(resfile_fn=resfile_fn, adaptive_partitioning=adaptive_partitioning, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins,
       bootstrap_set_size=options.bootstrap_set_size, sigalpha=options.sigalpha, permutations=options.permutations, num_sims=num_sims, num_structs=num_structs,
-      binwidth=options.binwidth, bins=bins, which_runs=which_runs, xvgorpdb=xvgorpdb, traj_fns=traj_fns, xvg_basedir=options.xvg_basedir, calc_variance=False, xvg_chidir=options.xvg_chidir,bootstrap_choose=options.bootstrap_set_size,pair_runs=pair_runs_array,skip=options.skip,skip_over_steps=options.zoom_to_step,last_step=options.last_step,calc_mutinf_between_sims=options.correct_formutinf_between_sims,load_matrices_numstructs=options.load_matrices_numstructs,plot_2d_histograms=options.plot_2d_histograms,max_num_chis=options.max_num_chis,pdbfile=options.pdbfile, xtcfile=options.xtcfile, output_timeseries=options.output_timeseries,lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points)
+      binwidth=options.binwidth, bins=bins, which_runs=which_runs, xvgorpdb=xvgorpdb, traj_fns=traj_fns, xvg_basedir=options.xvg_basedir, calc_variance=False, xvg_chidir=options.xvg_chidir,bootstrap_choose=options.bootstrap_set_size,pair_runs=pair_runs_array,skip=options.skip,skip_over_steps=options.zoom_to_step,last_step=options.last_step,calc_mutinf_between_sims=options.correct_formutinf_between_sims,load_matrices_numstructs=options.load_matrices_numstructs,plot_2d_histograms=options.plot_2d_histograms,max_num_chis=options.max_num_chis,pdbfile=options.pdbfile, xtcfile=options.xtcfile, output_timeseries=options.output_timeseries,lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points, cyclic_permut=options.cyclic_permut)
 
 
     print run_params
@@ -7850,14 +8122,14 @@ if __name__ == "__main__":
             mut_info_res_sumoverchis_matrix_sig_05[:,j,i] = mut_info_res_sumoverchis_matrix_sig_05[:,i,j]
 
             
-            mut_info_norm_res_sumoverchis_matrix_sig_avg_01[i,j] = average(mut_info_norm_res_sumoverchis_matrix_sig_01[:,i,j])
-            mut_info_norm_res_sumoverchis_matrix_sig_avg_05[i,j] = average(mut_info_norm_res_sumoverchis_matrix_sig_05[:,i,j])
 
             mut_info_norm_res_sumoverchis_matrix_sig_01[:,i,j] /=  (mutinf_norm_these_res + SMALL)
             mut_info_norm_res_sumoverchis_matrix_sig_05[:,i,j] /=  (mutinf_norm_these_res + SMALL)
             mut_info_norm_res_sumoverchis_matrix_sig_01[:,j,i] = mut_info_norm_res_sumoverchis_matrix_sig_01[:,i,j] 
             mut_info_norm_res_sumoverchis_matrix_sig_05[:,j,i] = mut_info_norm_res_sumoverchis_matrix_sig_05[:,i,j] 
             
+            mut_info_norm_res_sumoverchis_matrix_sig_avg_01[i,j] = average(mut_info_norm_res_sumoverchis_matrix_sig_01[:,i,j])
+            mut_info_norm_res_sumoverchis_matrix_sig_avg_05[i,j] = average(mut_info_norm_res_sumoverchis_matrix_sig_05[:,i,j])
             mut_info_norm_res_sumoverchis_matrix_sig_avg_01[j,i] = mut_info_norm_res_sumoverchis_matrix_sig_avg_01[i,j]
             mut_info_norm_res_sumoverchis_matrix_sig_avg_05[j,i] = mut_info_norm_res_sumoverchis_matrix_sig_avg_05[i,j]
             mut_info_norm_res_sumoverchis_matrix_avg[i,j] /= (mutinf_norm_these_res + SMALL)

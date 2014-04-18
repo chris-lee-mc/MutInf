@@ -1,6 +1,6 @@
 #Python script to analyze dihedrals. Usage: "python dihedral_analyze.py (list of files to plot). D. Mobley, 5/16/07"
 from numpy import *
-from pylab import *
+from matplotlib import *
 import sys
 import re
 from optparse import OptionParser
@@ -98,10 +98,13 @@ Note that units are as in xvg file (normall kJ/mol for energies from GROMACS)
 #READ INPUT ARGUMENTS
 #===================================================
 parser=OptionParser()
-parser.add_option("-p", "--pmf", default="yes", type="string", help="pdb file")
+parser.add_option("-p", "--pmf", default="no", type="string", help="whether to use population (no, default) or PMF (yes)")
+parser.add_option("-b", "--backbone", default="phipsichi", type="string", help="dihedral angles to use: phipsichi or phispi")
 parser.add_option("-d", "--offset", default=0, type=int, help="residue number offset")
 parser.add_option("-r", "--reference", default="reference", type="string", help="label for first dataset, i.e. reference")
 parser.add_option("-t", "--target", default="target", type="string", help="label for second dataset, i.e. target")
+parser.add_option("-s", "--subdir", default="", type="string", help="subdir beneath run1 director for dihedrals")
+parser.add_option("-i", "--inputdir", default="run", type="string", help="sum over counts in run directories whose names start with this argument. The default (run) will look for all run directories")
 (options,args)=parser.parse_args()
 
 
@@ -118,7 +121,7 @@ nbins=int(360./binwidth)
 directory1 = str(args[0])
 directory2 = str(args[1])
 residueID = str(args[2])
-print os.listdir(str(directory1)+'/')
+#print os.listdir(str(directory1)+'/')
 dir_names1 = []
 dir_names2 = []
 #for fn in os.listdir(str(directory1)+'/'):
@@ -130,8 +133,9 @@ dir_names2 = []
 #    if fn.startswith("run"):
 #       dir_names2.append(fn)
 
-dir_names1 = [fn for fn in os.listdir(str(directory1)+'/') if fn.startswith("run")]
-dir_names2 = [fn for fn in os.listdir(str(directory2)+'/') if fn.startswith("run")]
+dir_names1 = [fn for fn in os.listdir(str(directory1)+'/') if fn.startswith(options.inputdir)]
+dir_names2 = [fn for fn in os.listdir(str(directory2)+'/') if fn.startswith(options.inputdir)]
+print dir_names1
 num_sims=min(len(dir_names1),len(dir_names2))
 if (num_sims == len(dir_names1)):
    dir_names = dir_names1
@@ -141,17 +145,21 @@ else:
 #see what torsions are present
 
 torsion_list = []
-torsions_to_check = ["phi","psi","chi1","chi2","chi3","chi4"]
+if(options.backbone == "phipsichi"):
+    torsions_to_check = ["phi","psi","chi1","chi2","chi3","chi4"]
+else:
+    torsions_to_check = ["phi","psi"]
+
 for torsion in torsions_to_check:
-   print "Looking for "+directory1+'/run1/'+torsion+str(residueID)+str(".xvg.gz")
-   print os.path.exists(directory1+'/run1/'+torsion+str(residueID)+str(".xvg.gz"))
-   print "Looking for "+directory2+'/run1/'+torsion+str(residueID)+str(".xvg.gz")
-   print os.path.exists(directory2+'/run1/'+torsion+str(residueID)+str(".xvg.gz"))
+   print "Looking for "+directory1+'/run1/'+options.subdir+torsion+str(residueID)+str(".xvg.gz")
+   print os.path.exists(directory1+'/run1/'+options.subdir+torsion+str(residueID)+str(".xvg.gz"))
+   print "Looking for "+directory2+'/run1/'+options.subdir+torsion+str(residueID)+str(".xvg.gz")
+   print os.path.exists(directory2+'/run1/'+options.subdir+torsion+str(residueID)+str(".xvg.gz"))
 
    not_appended = True
    for residueID_1 in (residueID, residueID.replace("HIP","HIS"), residueID.replace("HID","HIS"), residueID.replace("HIE","HIS"), residueID.replace("HIS","HID"), residueID.replace("HIS","HIE"), residueID.replace("HIS","HIP"), residueID.replace("T2P","THR"), residueID.replace("S2P","SER"), residueID.replace("THR","T2P"), residueID.replace("SER","S2P")):
       for residueID_2 in (residueID, residueID.replace("HIP","HIS"), residueID.replace("HID","HIS"), residueID.replace("HIE","HIS"), residueID.replace("HIS","HID"), residueID.replace("HIS","HIE"), residueID.replace("HIS","HIP"), residueID.replace("T2P","THR"), residueID.replace("S2P","SER"), residueID.replace("THR","T2P"), residueID.replace("SER","S2P")):
-         if((os.path.exists(directory1+'/run1/'+torsion+str(residueID_1)+str(".xvg")) and os.path.exists(directory2+'/run1/'+torsion+str(residueID_2)+str(".xvg"))) or (os.path.exists(directory1+'/run1/'+torsion+str(residueID_1)+str(".xvg.gz")) and os.path.exists(directory2+'/run1/'+torsion+str(residueID_2)+str(".xvg.gz")))):
+         if((os.path.exists(directory1+'/run1/'+options.subdir+torsion+str(residueID_1)+str(".xvg")) and os.path.exists(directory2+'/run1/'+options.subdir+torsion+str(residueID_2)+str(".xvg"))) or (os.path.exists(directory1+'/run1/'+options.subdir+torsion+str(residueID_1)+str(".xvg.gz")) and os.path.exists(directory2+'/run1/'+options.subdir+torsion+str(residueID_2)+str(".xvg.gz")))):
             residueID_temp = residueID_1
             residueID_targ = residueID_2
             if not_appended: 
@@ -160,6 +168,8 @@ for torsion in torsions_to_check:
 
 mysearch = re.compile("[0-9]+")
 resnum_match=re.search(mysearch, residueID)
+residueID.replace("T2P","TPO")
+residueID.replace("S2P","SEP")
 resnum=str(int(resnum_match.group(0))+int(options.offset))
 print "output resnum: "+resnum
 residueID_output=re.sub(mysearch,resnum,residueID)
@@ -192,48 +202,68 @@ if torsion_list[0] == "phi" and torsion_list[1] == "psi": #then make a ramachand
   ax = plt.subplot(rows, columns, ct+1)
 
   #Read data
-  angles1phi = None
-  angles2phi = None
-  angles1psi = None
-  angles2psi = None
+  angles1phi = []
+  angles2phi = []
+  angles1psi = []
+  angles2psi = []
  
   for mydir in dir_names:
-     file1phi=directory1+'/run1/'+"phi"+str(residueID_temp)+str(".xvg")
-     file2phi=directory2+'/run1/'+"phi"+str(residueID_targ)+str(".xvg")
-     file1psi=directory1+'/run1/'+"psi"+str(residueID_temp)+str(".xvg")
-     file2psi=directory2+'/run1/'+"psi"+str(residueID_targ)+str(".xvg")
+     file1phi=directory1+'/'+mydir+'/'+options.subdir+"phi"+str(residueID_temp)+str(".xvg")
+     file2phi=directory2+'/'+mydir+'/'+options.subdir+"phi"+str(residueID_targ)+str(".xvg")
+     file1psi=directory1+'/'+mydir+'/'+options.subdir+"psi"+str(residueID_temp)+str(".xvg")
+     file2psi=directory2+'/'+mydir+'/'+options.subdir+"psi"+str(residueID_targ)+str(".xvg")
      try:
         (data1phi,titlestr)=readxvg(file1phi)
         (data2phi,titlestr2)=readxvg(file2phi)
         (data1psi,titlestr)=readxvg(file1psi)
         (data2psi,titlestr2)=readxvg(file2psi)
      except:
-        file1phi=directory1+'/run1/'+"phi"+str(residueID_temp)+str(".xvg.gz")
-        file2phi=directory2+'/run1/'+"phi"+str(residueID_targ)+str(".xvg.gz")
-        file1psi=directory1+'/run1/'+"psi"+str(residueID_temp)+str(".xvg.gz")
-        file2psi=directory2+'/run1/'+"psi"+str(residueID_targ)+str(".xvg.gz")
+        file1phi=directory1+'/'+mydir+'/'+options.subdir+"phi"+str(residueID_temp)+str(".xvg.gz")
+        file2phi=directory2+'/'+mydir+'/'+options.subdir+"phi"+str(residueID_targ)+str(".xvg.gz")
+        file1psi=directory1+'/'+mydir+'/'+options.subdir+"psi"+str(residueID_temp)+str(".xvg.gz")
+        file2psi=directory2+'/'+mydir+'/'+options.subdir+"psi"+str(residueID_targ)+str(".xvg.gz")
         (data1phi,titlestr)=readxvg(file1phi)
         (data2phi,titlestr2)=readxvg(file2phi)
         (data1psi,titlestr)=readxvg(file1psi)
         (data2psi,titlestr2)=readxvg(file2psi)
-     if angles1phi == None:
-        angles1phi = data1phi[:,1]
-     else:
-        angles1phi +=data1phi[:,1]
+     #if angles1phi == None:
+     for x in data1phi[:,1]:
+         angles1phi.append(x)
+     #else:
+     #   angles1phi.append(x) for x in list(data1phi[:,1]))
 
-     if angles2phi == None:
-        angles2phi = data2phi[:,1]
-     else:
-        angles2phi += data2phi[:,1]
+     #if angles2phi == None:
+     #   angles2phi = list(data2phi[:,1])
+     #else:
+     for x in data2phi[:,1]:
+        angles2phi.append(x)
      
-     if angles1psi == None:
-        angles1psi = data1psi[:,1]
-     else:
-        angles1psi +=data1psi[:,1]
-     if angles2psi == None:
-        angles2psi = data2psi[:,1]
-     else:
-        angles2psi += data2psi[:,1]
+     #if angles1psi == None:
+     #   angles1psi = list(data1psi[:,1])
+     #else:
+     for x in data1psi[:,1]:
+        angles1psi.append(x)
+
+     #if angles2psi == None:
+     #   angles2psi = list(data2psi[:,1])
+     #else:
+     for x in data2psi[:,1]:
+        angles2psi.append(x)
+
+  #print "angles1phi"
+  #print angles1phi
+  temp1=array(angles1phi,float64)
+  del angles1phi
+  angles1phi = temp1
+  temp2=array(angles2phi,float64)
+  del angles2phi
+  angles2phi = temp2
+  temp3=array(angles1psi,float64)
+  del angles1psi
+  angles1psi = temp3
+  temp4=array(angles2psi,float64)
+  del angles2psi
+  angles2psi = temp4
 
   #Check and make sure within -180 to 180; I think this should do it 
   angles1phi=(angles1phi+180)%360-180
@@ -257,7 +287,7 @@ if torsion_list[0] == "phi" and torsion_list[1] == "psi": #then make a ramachand
       angles2[1,i] = angles2psi[i]
       
   #density1 = gaussian_kde(angles1)
-  #density1.covariance_factor = lambda : .1
+  #density1.covariance_factor = lambda : .01
   #density1._compute_covariance()
   #xs = arange(-180,180,binwidth)
   xs = meshgrid(arange(-180,180,binwidth), arange(-180,180,binwidth))
@@ -306,7 +336,7 @@ if torsion_list[0] == "phi" and torsion_list[1] == "psi": #then make a ramachand
   ax = plt.subplot(rows, columns, ct+2) 
   #ax.set_xlim(-180,180)
   #density2 = gaussian_kde(angles2)
-  #density2.covariance_factor = lambda : .1
+  #density2.covariance_factor = lambda : .01
   #density2._compute_covariance()
   #xs = arange(-180,180,binwidth)
   xs = meshgrid(arange(-180,180,binwidth), arange(-180,180,binwidth))
@@ -400,30 +430,42 @@ for torsion in torsion_list :
   ax = plt.subplot(rows, columns, ct+1)
 
   #Read data
-  angles1 = None
-  angles2 = None
+  angles1 = []
+  angles2 = []
 
   
  
   for mydir in dir_names:
-     file1=directory1+'/run1/'+torsion+str(residueID_temp)+str(".xvg")
-     file2=directory2+'/run1/'+torsion+str(residueID_targ)+str(".xvg")
+     file1=directory1+'/run1/'+options.subdir+torsion+str(residueID_temp)+str(".xvg")
+     file2=directory2+'/run1/'+options.subdir+torsion+str(residueID_targ)+str(".xvg")
+                      
+                      
      try:
         (data1,titlestr)=readxvg(file1)
         (data2,titlestr2)=readxvg(file2)
      except:
-        file1=directory1+'/run1/'+torsion+str(residueID_temp)+str(".xvg.gz")
-        file2=directory2+'/run1/'+torsion+str(residueID_targ)+str(".xvg.gz")
+        file1=directory1+'/run1/'+options.subdir+torsion+str(residueID_temp)+str(".xvg.gz")
+        file2=directory2+'/run1/'+options.subdir+torsion+str(residueID_targ)+str(".xvg.gz")
+
+
         (data1,titlestr)=readxvg(file1)
         (data2,titlestr2)=readxvg(file2)
-     if angles1 == None:
-        angles1 = data1[:,1]
-     else:
-        angles1 +=data1[:,1]
-     if angles2 == None:
-        angles2 = data2[:,1]
-     else:
-        angles2 += data2[:,1]
+     #if angles1 == None:
+     #   angles1 = list(data1[:,1])
+     #else:
+     for x in data1[:,1]:
+        angles1.append(x)
+     #if angles2 == None:
+     #   angles2 = list(data2[:,1])
+     #else:
+     for x in data2[:,1]:
+        angles2.append(x)
+  temp5 = array(angles1, float64)
+  del angles1
+  angles1 = temp5
+  temp6 = array(angles2, float64)
+  del angles2
+  angles2 = temp6
   #Check and make sure within -180 to 180; I think this should do it 
   angles1=(angles1+180)%360-180
   angles2=(angles2+180)%360-180
@@ -468,7 +510,7 @@ for torsion in torsion_list :
   #ax.set_xlim(-180,180)
   
   density1 = gaussian_kde(angles1)
-  density1.covariance_factor = lambda : .05
+  density1.covariance_factor = lambda : .01
   density1._compute_covariance()
   if(symmetry==False):
       xs = arange(-180,180,binwidth)
@@ -488,7 +530,7 @@ for torsion in torsion_list :
 
   #ax.set_xlim(-180,180)
   density2 = gaussian_kde(angles2)
-  density2.covariance_factor = lambda : .05
+  density2.covariance_factor = lambda : .01
   density2._compute_covariance()
   if(symmetry==False):
       xs = arange(-180,180,binwidth)
@@ -577,11 +619,14 @@ for torsion in torsion_list :
   #Labels at 90
   
   
-  title(titlestr)
+  
   
   plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-       ncol=2, mode="expand", borderaxespad=0.)
+       ncol=2, mode="expand", borderaxespad=0.,title=titlestr,fontsize=10 )
 
+  #plt.title(titlestr)
+  #ax.legend(loc='upper center', shadow=False)
+  #plt.legend(bbox_to_anchor=(1.05,1), loc=2, borderaxespad=0)
   #Increment subplot counter
   ct+=1
 
@@ -595,10 +640,12 @@ right = 0.9    # the right side of the subplots of the figure
 bottom = 0.1   # the bottom of the subplots of the figure
 top = 0.9      # the top of the subplots of the figure
 wspace = 0.2   # the amount of width reserved for blank space between subplots
-hspace = 0.5   # the amount of height reserved for white space between subplots
+hspace = 0.75   # the amount of height reserved for white space between subplots
 subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
 #plotname=pname+res+'.eps'
-plotname=pname+residueID_output+'.eps'
+#plotname=pname+residueID_output+'.eps'
+#just call it chi even if the residue only has phi and psi
+plotname="chi"+residueID_output+'.eps'
 savefig(plotname)
 os.system('ps2pdf'+' '+plotname)
 os.system('rm '+' '+plotname)

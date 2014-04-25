@@ -982,7 +982,10 @@ def calc_entropy(counts, nchi, numangles_bootstrap, calc_variance=False, entropy
     print "entij"
     print ((counts * 1.0 / numangles_bootstrap_chi_vector) * (log(numangles_bootstrap_chi_vector) - special.psi(counts + SMALL) - (1 - 2*int16(counts % 2)) / (counts + 1.0)))
     
-    entropy[:,:] = sum((counts * 1.0 / numangles_bootstrap_chi_vector) * (log(numangles_bootstrap_chi_vector) - special.psi(counts + SMALL) - (1 - 2*int16(counts % 2)) / (counts + 1.0)),axis=2) - log(normalization) 
+    if(NO_GRASSBERGER == False):
+           entropy[:,:] = sum((counts * 1.0 / numangles_bootstrap_chi_vector) * (log(numangles_bootstrap_chi_vector) - special.psi(counts + SMALL) - (1 - 2*int16(counts % 2)) / (counts + 1.0)),axis=2) - log(normalization) 
+    else:
+           entropy[:,:] = sum((counts * 1.0 / numangles_bootstrap_chi_vector) * (log((counts * 1.0 / numangles_bootstrap_chi_vector) + SMALLER)))
     #the -log(normalization) is to convert from discrete space to continuous space
     #symmetry is taken into acount as a contraction of the radial space over which integration occurs
     #the +log(symmetry_bootstraps) would be to correct for torsions with symmtery,
@@ -1394,6 +1397,7 @@ def calc_mutinf_multinomial_constrained( nbins, counts1, counts2, adaptive_parti
 
     if(numangles_bootstrap[0] > 0): #small sample stuff turned off for now cause it's broken
     #if(numangles_bootstrap[0] > 1000 and nbins >= 6):
+      if(NO_GRASSBERGER == False):     
         ent1_boots = sum((chi_counts1_vector * 1.0 / numangles_bootstrap_vector) * (log(numangles_bootstrap_vector) - special.psi(chi_counts1_vector + SMALL) - (1 - 2*(chi_counts1_vector % 2)) / (chi_counts1_vector + 1.0)),axis=2)
 
         ent2_boots = sum((chi_counts2_vector * 1.0 / numangles_bootstrap_vector) * (log(numangles_bootstrap_vector) - special.psi(chi_counts2_vector + SMALL) - (1 - 2*(chi_counts2_vector % 2)) / (chi_counts2_vector + 1.0)),axis=2)
@@ -1409,6 +1413,12 @@ def calc_mutinf_multinomial_constrained( nbins, counts1, counts2, adaptive_parti
                                special.psi(count_matrix_multi + SMALL)  \
                                - (1 - 2*(count_matrix_multi % 2)) / (count_matrix_multi + 1.0) \
                                ),axis=2))
+      else:  #using naive histogram p log p estimate
+        mutinf_thisdof =  sum((chi_counts1_vector * 1.0 / numangles_bootstrap_vector) * (log((chi_counts1_vector * 1.0 / numangles_bootstrap_vector + SMALLER))),axis=2) \
+            +     sum((chi_counts2_vector * 1.0 / numangles_bootstrap_vector) * (log((chi_counts2_vector * 1.0 / numangles_bootstrap_vector + SMALLER))),axis=2) \
+            -     sum((count_matrix_multi * 1.0 /numangles_bootstrap_matrix)  \
+                           * ( log((count_matrix_multi * 1.0 /numangles_bootstrap_matrix) + SMALLER)), axis=2)
+
         
     else:
         ent1_boots = sum((chi_counts1_vector + 1) * (1.0 / numangles_bootstrap_vector) * sumstuff(chi_counts1_vector,numangles_bootstrap_vector,permutations_multinomial),axis=2)
@@ -1777,6 +1787,79 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
        }
       """
 
+    code_no_grassberger = """
+    // weave6_markov
+    // bins dimensions: bootstrap_sets * markov_samples * bootstrap_choose * max_num_angles
+     #include <math.h>
+
+  
+     double weight;
+     int angle1_bin = 0;
+     int angle2_bin = 0 ;
+     int angle3_bin = 0;
+     int bin1, bin2, bin3 = 0;
+     int mybootstrap, mynumangles,markov_chain,anglenum;
+     //long  offset1, offset2, offset3, offset4;
+     long  counts1, counts2, counts12;
+     double counts1d, counts2d, counts12d;
+     double dig1, dig2;
+     double mysign1, mysign2 = 0 ;
+     for(mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
+      mynumangles = 0;
+      mynumangles = *(numangles_bootstrap + mybootstrap);  // original data went in using each sim separately using which_sims and simnum, but is read on a per-bootstrap basis
+      //printf("mynumangles: %i ", mynumangles);
+      //offset1 = mybootstrap*markov_samples*bootstrap_choose*max_num_angles;
+      //offset2 = mybootstrap*(markov_samples)*nbins; 
+      //offset3 = mybootstrap*(markov_samples)*nbins*nbins ;
+ 
+      #pragma omp parallel for private(markov_chain,anglenum, angle1_bin, angle2_bin, angle3_bin, counts1, counts2, mysign1, mysign2, bin1, bin2, dig1, dig2, counts1d, counts2d, counts12, counts12d) 
+      for (markov_chain=0; markov_chain < markov_samples ; markov_chain++) {
+        
+          for (anglenum=0; anglenum< mynumangles; anglenum++) {
+ 
+       
+             // python: self.bins_markov = zeros((self.nchi, bootstrap_sets, self.markov_samples, bootstrap_choose * max_num_angles ), int8)  --- but with chi already dereferenced :  the bin for each dihedral
+             // python: self.chi_counts_markov=zeros((self.nchi, bootstrap_sets, self.markov_samples, nbins), float64) --- but with chi already dereferenced   : since these can be weighted in advanced sampling like replica exchange
+             //if(anglenum % markov_interval[mybootstrap] == 0) {
+
+              angle1_bin = *(bins1  +  (long)(mybootstrap*markov_samples*bootstrap_choose*max_num_angles  + markov_chain*bootstrap_choose*max_num_angles +  anglenum));
+              angle2_bin = *(bins2  +  (long)(mybootstrap*markov_samples*bootstrap_choose*max_num_angles + markov_chain*bootstrap_choose*max_num_angles +  anglenum));
+        
+              
+              *(count_matrix_markov  + (long)(mybootstrap*(markov_samples)*nbins*nbins  +  markov_chain*nbins*nbins  +  angle1_bin*nbins +   angle2_bin )) += 1.0 ;  //* weight * weight;
+             //}
+             
+          }
+
+          // now actually compute the entropies for each order to be combined later
+ 
+          
+         for(bin1=0; bin1 < nbins; bin1++) 
+          { 
+           for(bin2=0; bin2 < nbins; bin2++)
+           {
+         
+          // ent1_boots = sum((chi_counts1_markov * 1.0 / numangles_bootstrap) * (log(numangles_bootstrap) - special.psi(chi_counts1_markov + SMALL) - ((-1) ** (chi_counts1_markov % 2)) / (chi_counts1_markov + 1.0)),axis=2)
+           counts12 = *(count_matrix_markov  + (long)( mybootstrap*(markov_samples)*nbins*nbins   +  markov_chain*nbins*nbins  +  bin1*nbins + bin2 ));
+ 
+           if(counts12 > 0)
+           {
+            mysign1 = 1.0L - 2*(counts12 % 2); // == -1 if it is odd, 1 if it is even
+            dig1 = xDiGamma_Function(counts12);
+           
+           
+           counts12d = 1.0 * counts12;
+           *(ent_1_2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALLER)); 
+           }
+          }
+         }
+       
+    
+
+        }
+       }
+      """
+
     code_markov_interval = """
     // weave6_markov
     // bins dimensions: bootstrap_sets * markov_samples * bootstrap_choose * max_num_angles
@@ -2013,7 +2096,13 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
     print chi_counts1_markov
     print "chi counts2_markov:"
     print chi_counts2_markov
-    weave.inline(code, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','chi_counts1_markov','chi_counts2_markov','markov_interval'],
+    if(NO_GRASSBERGER == False):
+           weave.inline(code, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','chi_counts1_markov','chi_counts2_markov','markov_interval'],
+                 #type_converters = converters.blitz,
+                 compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler] ,
+                 support_code=my_support_code )
+    else:
+           weave.inline(code_no_grassberger, ['numangles_bootstrap', 'nbins', 'bins1', 'bins2',  'count_matrix_markov','bootstrap_sets','markov_samples','max_num_angles','bootstrap_choose','offset','ent1_boots','ent2_boots','ent_1_2_boots','SMALL','SMALLER','chi_counts1_markov','chi_counts2_markov','markov_interval'],
                  #type_converters = converters.blitz,
                  compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler] ,
                  support_code=my_support_code )
@@ -2486,11 +2575,118 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
        }
       """
 
+    code_no_grassberger = """
+    // weave6
+    // bins dimensions: (permutations + 1) * bootstrap_sets * bootstrap_choose * max_num_angles
+     //#include <math.h>
+     double weight;
+     int angle1_bin;
+     int angle2_bin;
+     int bin1;
+     int bin2;
+     int mybootstrap, permut;
+     long anglenum, mynumangles, counts1, counts2, counts12 ; 
+     double mysign1, mysign2, mysign12, counts1d, counts2d, counts12d, dig1, dig2, dig12;
+     
+     #pragma omp parallel for private(mybootstrap,mynumangles,permut,anglenum,angle1_bin,angle2_bin,weight,bin1, bin2, mysign1, mysign2, mysign12, counts1, counts1d, counts2, counts2d, counts12, counts12d, dig1, dig2, dig12 )
+     for( mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
+      mynumangles = 0;
+      mynumangles = *(numangles_bootstrap + mybootstrap);
+      for (permut=0; permut < permutations + 1; permut++) {          
+          for (anglenum=offset; anglenum< mynumangles; anglenum++) {
+          //if(mybootstrap == bootstrap_sets - 1) {
+          //  //printf("bin12 %i \\n",(*(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum))*nbins +   (*(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum)));
+          //  }
+           if(anglenum == mynumangles - 1) {
+             printf(""); //just to make sure count matrix values are written to disk before the next loop
+           }
+           //if(anglenum % markov_interval[mybootstrap] == 0) { 
+              angle1_bin = *(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum);
+              angle2_bin = *(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum - offset);
+              weight = *(boot_weights + mybootstrap*bootstrap_choose*max_num_angles + anglenum); //assumes mynumangles same for all dihedrals, for nonzero offsets assumes equal weights
+              *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  angle1_bin*nbins +   angle2_bin ) += 1.0 * weight * weight;
+           //} 
+          }
+           // do singlet entropies here
+           for(bin1=0; bin1 < nbins; bin1++) 
+           { 
+             if(markov_interval[mybootstrap] < 2) {
+              counts1 = int(*(chi_counts1_vector  + (long)( mybootstrap*(permutations + 1)*nbins   +  permut*nbins  +  bin1  )));
+             }
+             else {
+              counts1 = 0;
+              for(bin2=0; bin2 < nbins; bin2++) {
+               counts1 += *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  bin1*nbins + bin2);
+              }
+             }
+   
+              if(counts1 > 0)
+              {
+                mysign1 = 1.0L - 2*(counts1 % 2); // == -1 if it is odd, 1 if it is even
+                dig1 = xDiGamma_Function(counts1);
+                
+                
+                counts1d = 1.0 * counts1;
+                *(ent_1_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALLER));
+              }
+
+             if(markov_interval[mybootstrap] < 2) {
+               counts2 = int(*(chi_counts2_vector  + (long)( mybootstrap*(permutations + 1)*nbins   +  permut*nbins  +  bin1  )));
+             }
+             else {
+               counts2 = 0;
+               for(bin2=0; bin2 < nbins; bin2++) {
+                counts2 += *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  bin2*nbins + bin1);
+              }
+             }
+ 
+              if(counts2 > 0)
+              {
+                mysign2 = 1.0L - 2*(counts2 % 2); // == -1 if it is odd, 1 if it is even
+                dig2 = xDiGamma_Function(counts2);
+                
+                
+                counts2d = 1.0 * counts2;
+                *(ent_2_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts2d / mynumangles)*(log((double)counts2d / mynumangles + SMALLER)); 
+              }
+
+
+
+            // do doublet entropy here
+            for(bin2=0; bin2 < nbins; bin2++)
+             {
+         
+             // ent1_boots = sum((chi_counts1_markov * 1.0 / numangles_bootstrap) * (log(numangles_bootstrap) - special.psi(chi_counts1_markov + SMALL) - ((-1) ** (chi_counts1_markov % 2)) / (chi_counts1_markov + 1.0)),axis=2)
+             counts12 = int(*(count_matrix  + (long)( mybootstrap*(permutations + 1)*nbins*nbins   +  permut*nbins*nbins  +  bin1*nbins + bin2 )));
+ 
+              if(counts12 > 0)
+              {
+                mysign12 = 1.0L - 2*(counts12 % 2); // == -1 if it is odd, 1 if it is even
+                dig12 = xDiGamma_Function(counts12);
+                
+                
+                counts12d = 1.0 * counts12;
+                *(ent_1_2_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALLER)); 
+              }
+            }
+         }
+       
+    
+        }
+       }
+      """
+
  
 
     if(VERBOSE >= 2): print "about to populate count_matrix"
-    weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
-                 'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots','markov_interval'],
+    if(NO_GRASSBERGER == False):
+           weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
+                 'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots','markov_interval','SMALL'],
+                 compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
+                 support_code=my_support_code)
+    else:
+           weave.inline(code_no_grassberger, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
+                 'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots','markov_interval','SMALLER'],
                  compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
                  support_code=my_support_code)
     if (no_boot_weights != False ):
@@ -2687,7 +2883,13 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
            #weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose'],
            #      #type_converters = converters.blitz,
            #      compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler], library_dirs=["/usr/lib64/"], libraries=["stdc++"])
-           weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
+           if(NO_GRASSBERGER == False):
+              weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
+                 'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots'],
+                 compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
+                 support_code=my_support_code)
+           else:
+              weave.inline(code_no_grassberger, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
                  'chi_counts1_vector','chi_counts2_vector','ent_1_boots','ent_2_boots','ent_1_2_boots'],
                  compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
                  support_code=my_support_code)
@@ -3266,7 +3468,8 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
     ent1_boots_sims = zeros((bootstrap_sets, num_pair_runs, permutations_sequential + 1),float64)
     ent2_boots_sims = zeros((bootstrap_sets, num_pair_runs, permutations_sequential + 1),float64)
 
-    for bootstrap in range(bootstrap_sets):
+    if(NO_GRASSBERGER == False):
+      for bootstrap in range(bootstrap_sets):
         for which_pair in range(num_pair_runs):
             #pick index 0 for axis=2 at the end because the arrays are over 
             
@@ -3304,6 +3507,43 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
             ent2_boots_sims[bootstrap,which_pair,:] = myent2
             #ent1_boots = average(ent1_boots_sims,axis=1) # avg over sims in each bootstrap
             #ent2_boots = average(ent2_boots_sims,axis=1) # avg over sims in each bootstrap
+
+
+    else:  #do not use Grassberger corrected entropies
+      for bootstrap in range(bootstrap_sets):
+        for which_pair in range(num_pair_runs):
+            #pick index 0 for axis=2 at the end because the arrays are over 
+            
+            myent1                                \
+                                                  =\
+                                                  sum((chi_counts_sequential1[pair_runs[bootstrap,which_pair,0]] \
+                                                       * 1.0 / min_angles_boot_pair_runs_vector[bootstrap,pair_runs[bootstrap,which_pair,0],0,:]) \
+                                                      * (log((chi_counts_sequential1[pair_runs[bootstrap,which_pair,0]] \
+                                                       * 1.0 / min_angles_boot_pair_runs_vector[bootstrap,pair_runs[bootstrap,which_pair,0],0,:]) + SMALLER)),axis=0) #sum over bins
+            
+            #print "ent1 boots sims thispair shape: "
+            #print myent1.shape
+            #print "ent1 boots: "+str(myent1)
+
+            ent1_boots_sims[bootstrap,which_pair,:] = myent1
+            
+            myent2                                \
+                                                  =\
+                                                  sum((chi_counts_sequential2[pair_runs[bootstrap,which_pair,1]] \
+                                                       * 1.0 / min_angles_boot_pair_runs_vector[bootstrap,pair_runs[bootstrap,which_pair,1],0,:]) \
+                                                      * (log((chi_counts_sequential2[pair_runs[bootstrap,which_pair,1]] \
+                                                       * 1.0 / min_angles_boot_pair_runs_vector[bootstrap,pair_runs[bootstrap,which_pair,1],0,:]) + SMALLER )),axis=0) #sum over bins
+
+
+            #print "ent1 boots sims thispair shape: "
+            #print myent2.shape
+            #print "ent1 boots: "+str(myent2)
+
+            ent2_boots_sims[bootstrap,which_pair,:] = myent2
+            #ent1_boots = average(ent1_boots_sims,axis=1) # avg over sims in each bootstrap
+            #ent2_boots = average(ent2_boots_sims,axis=1) # avg over sims in each bootstrap
+
+
 
     #print "ent1 boots sims shape:"
     #print shape(ent1_boots_sims)
@@ -3436,7 +3676,8 @@ def calc_excess_mutinf(chi_counts1, chi_counts2, bins1, bins2, chi_counts_sequen
                 
     #print "ind_mutinfs:"+str(independent_mutinf_thisdof)
     #print "tot_mutinfs_diff_sims:"+str(mutinf_tot_thisdof_different_sims)
-    uncorrected_mutinf_thisdof = mutinf_tot_thisdof[:,0]
+    uncorrected_mutinf_thisdof = array(mutinf_tot_thisdof[:,0],float64)
+    print "uncorrected mutinfs thisdof:"+str(uncorrected_mutinf_thisdof)
     
     if(markov_samples == 0):
         excess_mutinf_thisdof = mutinf_tot_thisdof[:,0] #no correction to mutinf value for markov model
@@ -3477,7 +3718,7 @@ def calc_excess_mutinf(chi_counts1, chi_counts2, bins1, bins2, chi_counts_sequen
                   print "one or more values were not significant!"
     #remove values less than zero, as pairwise mutual information should be zero or greater
     excess_mutinf_thisdof[excess_mutinf_thisdof < 0] = 0
-    mutinf_tot_gt_eq_0 = mutinf_tot_thisdof[:,0]
+    mutinf_tot_gt_eq_0 = array(mutinf_tot_thisdof[:,0],float64)
     mutinf_tot_gt_eq_0[ mutinf_tot_gt_eq_0 < 0 ] = 0 #only values greater than or equal to zero
     #remove values that are not significant
     excess_mutinf_thisdof *= (1.0 - pvalue_toolow * 1.0) #zeros elements with pvalues that are below threshold
@@ -3485,7 +3726,7 @@ def calc_excess_mutinf(chi_counts1, chi_counts2, bins1, bins2, chi_counts_sequen
     mutinf_tot_thisdof_for_MI_norm = mutinf_tot_gt_eq_0 * (1.0 - pvalue_toolow * 1.0)
 
     MI_norm = mutinf_tot_thisdof_for_MI_norm / (ent12_boots + SMALL*SMALL)  #from Relly Brandman
-    
+    MI_norm[MI_norm < 0 ] = 0 #zero values that are less than zero if for some reason ent12_boots was less than zero
 
     #dKLtot_dKL1_dKL2 *= (1.0 - pvalue_toolow * 1.0)      #zeros KLdiv Hessian matrix elements that aren't significant
     if(VERBOSE >= 1):   
@@ -3517,96 +3758,6 @@ def calc_excess_mutinf(chi_counts1, chi_counts2, bins1, bins2, chi_counts_sequen
 
 
 
-# Number of chi angles per residue
-NumChis = { "ALA":0, "CYS":1, "CYN":1, "CYX":2, "CY2":2, "CYM":1, "ASP":2, "AS4":2, "ASH":2, "GLU":3, "GL4": 3, "GLH":3, "PHE":2, 
-            "GLY":0, "HIS":2, "HIP":2, "HIE":2, "HID":2, "ILE":2, "LYS":4, "LYP":4, "LEU":2, "MET":3, "ASN":2, "GLN":3,
-            "PRO":1, #GF: can't find def for chi2; rosetta uses chi1 only,
-            "ARG":4, "SER":2, "THR":2, "VAL":1,"TRP":2, "TYR":2, "CTH":2, "F3G":1, 
-            "TPO":1, "T2P":1, "S2P":1, "SEP":1 ,  #g_chi doesn't give dihedrals for phosphorylated aa
-            "ACK":4, #acetyl-lysine   #ffAmber N and C termini next:
-            "NALA":0, "NCYS":1, "NCYN":1, "NCYX":1, "NCY2":2, "NASP":2, "NAS4":2, "NASH":2, "NGLU":3, "NGL4": 3, "NGLH":3, "NPHE":2, 
-            "NGLY":0, "NHIS":2, "NHIP":2, "NHIE":2, "NHID":2, "NILE":2, "NLYS":4, "NLYP":4, "NLEU":2, "NMET":3, "NASN":2, "NGLN":3,
-            "NPRO":1, "NARG":4, "NSER":2, "NTHR":2, "NVAL":1,"NTRP":2, "NTYR":2,
-            "CALA":0, "CCYS":1, "CCYN":1, "CCYX":1, "CCY2":2, "CASP":2, "CAS4":2, "CASH":2, "CGLU":3, "CGL4": 3, "CGLH":3, "CPHE":2, 
-            "CGLY":0, "CHIS":2, "CHIP":2, "CHIE":2, "CHID":2, "CILE":2, "CLYS":4, "CLYP":4, "CLEU":2, "CMET":3, "CASN":2, "CGLN":3,
-            "CPRO":1, "CARG":4, "CSER":2, "CTHR":2, "CVAL":1,"CTRP":2, "CTYR":2,
-            "PHI":1,"PSI":1 #these last two are for treating phi and psi as belonging to different residues for alanine tripeptide for example
-            } 
-
-#next is for pdb trajectories -- no -OH chis
-NumChis_Safe = { "ALA":0, "CYS":1, "CYN":1, "CYX":2, "CY2":2, "CYM":1, "ASP":2, "AS4":2, "ASH":2, "GLU":3, "GL4": 3, "GLH":3, "PHE":2, 
-            "GLY":0, "HIS":2, "HIP":2, "HIE":2, "HID":2, "ILE":2, "LYS":4, "LYP":4, "LEU":2, "MET":3, "ASN":2, "GLN":3,
-            "PRO":1, #GF: can't find def for chi2; rosetta uses chi1 only,
-            "ARG":4, "SER":1, "THR":1, "VAL":1,"TRP":2, "TYR":2, "CTH":2, "F3G":1, 
-            "TPO":1, "T2P":1, "S2P":1, "SEP":1 ,  #g_chi doesn't give dihedrals for phosphorylated aa
-            "ACK":4, #acetyl-lysine   #ffAmber N and C termini next:
-            "NALA":0, "NCYS":1, "NCYN":1, "NCYX":1, "NCY2":2, "NASP":2, "NAS4":2, "NASH":2, "NGLU":3, "NGL4": 3, "NGLH":3, "NPHE":2, 
-            "NGLY":0, "NHIS":2, "NHIP":2, "NHIE":2, "NHID":2, "NILE":2, "NLYS":4, "NLYP":4, "NLEU":2, "NMET":3, "NASN":2, "NGLN":3,
-            "NPRO":1, "NARG":4, "NSER":1, "NTHR":1, "NVAL":1,"NTRP":2, "NTYR":2,
-            "CALA":0, "CCYS":1, "CCYN":1, "CCYX":1, "CCY2":2, "CASP":2, "CAS4":2, "CASH":2, "CGLU":3, "CGL4": 3, "CGLH":3, "CPHE":2, 
-            "CGLY":0, "CHIS":2, "CHIP":2, "CHIE":2, "CHID":2, "CILE":2, "CLYS":4, "CLYP":4, "CLEU":2, "CMET":3, "CASN":2, "CGLN":3,
-            "CPRO":1, "CARG":4, "CSER":1, "CTHR":1, "CVAL":1,"CTRP":2, "CTYR":2,
-            } 
-
-TorsionAtoms = { "ALA":[" CB "],
-                 "CYS":[" CB ", " SG "],
-                 "CYX":[" CB ", " SG "],
-                 "CYN":[" CB ", " SG "],
-                 "CYM":[" CB ", " SG "],
-                 "ASP":[" CB ", " CG "],
-                 "ASH":[" CB ", " CG "],
-                 "GLU":[" CB ", " CG "," CD "],
-                 "GLH":[" CB ", " CG "," CD "],
-                 "HIS":[" CB ", " CG "],
-                 "ILE":[" CB ", " CG1"],
-                 "LEU":[" CB ", " CG "],
-                 "LYS":[" CB ", " CG ", " CD "," CE "],
-                 "LYP":[" CB ", " CG ", " CD "," CE "],
-                 "MET":[" CB ", " CG ", " SD "],
-                 "PHE":[" CB ", " CG "],
-                 "PRO":[" CB ", " CG "],
-                 "PTR":[" CB ", " CG "],
-                 "SER":[" CB ", " OG "],
-                 "S2P":[" CB ", " OG "],
-                 "SEP":[" CB ", " CG "],
-                 "THR":[" CB ", " OG1"],
-                 "TPO":[" CB ", " CG "],
-                 "T2P":[" CB ", " OG1"],
-                 "TRP":[" CB ", " CG "],
-                 "TYR":[" CB ", " CG "],
-                 "TYP":[" CB ", " CG "],
-                 "VAL":[" CB ", " CG1"] 
-                 }
-
-TorsionAtoms2 = { "ALA":["_CB_"],
-                 "CYS":["_CB_", "_SG_"],
-                 "CYX":["_CB_", "_SG_"],
-                 "CYN":["_CB_", "_SG_"],
-                 "CYM":["_CB_", "_SG_"],
-                 "ASP":["_CB_", "_CG_"],
-                 "ASH":["_CB_", "_CG_"],
-                 "GLU":["_CB_", "_CG_","_CD_"],
-                 "GLH":["_CB_", "_CG_","_CD_"],
-                 "HIS":["_CB_", "_CG_"],
-                 "ILE":["_CB_", "_CG1"],
-                 "LEU":["_CB_", "_CG_"],
-                 "LYS":["_CB_", "_CG_", "_CD_","_CE_"],
-                 "LYP":["_CB_", "_CG_", "_CD_","_CE_"],
-                 "MET":["_CB_", "_CG_", "_SD_"],
-                 "PHE":["_CB_", "_CG_"],
-                 "PRO":["_CB_", "_CG_"],
-                 "PTR":["_CB_", "_CG_"],
-                 "SER":["_CB_", " OG "],
-                 "S2P":["_CB_", " OG "],
-                 "SEP":["_CB_", "_CG_"],
-                 "THR":["_CB_", " OG1"],
-                 "TPO":["_CB_", "_CG_"],
-                 "T2P":["_CB_", " OG1"],
-                 "TRP":["_CB_", "_CG_"],
-                 "TYR":["_CB_", "_CG_"],
-                 "TYP":["_CB_", "_CG_"],
-                 "VAL":["_CB_", "_CG1"] 
-                 }
 
 xtc_and_pdb_data = []
 tot_residues = 0
@@ -4061,11 +4212,12 @@ class ResidueChis:
             has_phipsi = False
      return has_phipsi
 
-   def _load_xvg_data(self, basedir, num_sims, max_angles, chi_dir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0, last_step=None, coarse_discretize=None, split_main_side=None):
+   def _load_xvg_data(self, basedir, num_sims, max_angles, chi_dir = "/dihedrals/g_chi/", skip=1, skip_over_steps=0, last_step=None, coarse_discretize=None, split_main_side=None, backbone_only=0):
       myname = self.name
       mynumchis = self.get_num_chis(myname)
       shifted_angles = zeros((self.nchi,num_sims,max_angles),float64)
       nchi = self.nchi 
+      backbone_only = self.backbone_only
       if(split_main_side == True):
              print "in loading data, treating main chain and side chain separately"
              if self.chain == "S":
@@ -4090,7 +4242,7 @@ class ResidueChis:
          #print "Chi:"+str(chi_num+1)+"\n"
          for sequential_sim_num in range(num_sims):
             #sim_index_str = str(self.which_runs[sequential_sim_num])
-            if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+            if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                 if(chi_num == 0):
                     xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname+res_num+".xvg"
                 if(chi_num == 1):
@@ -4108,7 +4260,7 @@ class ResidueChis:
             if not (os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz")):
                if myname == "LYS":
                   for myname_alt in ("LYSH", "LYP"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4125,7 +4277,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break
                if myname == "ASP" or myname == "ASH" or myname == "AS4":
                   for myname_alt in ("ASH","AS4", "ASP"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4142,7 +4294,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break   
                if myname == "GLU" or myname == "GLH" or myname == "GL4":
                   for myname_alt in ("GLH","GL4","GLU"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4159,7 +4311,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break   
                if myname == "HIS" or myname == "HID" or myname == "HIE" or myname == "HID" or myname == "HIP":
                   for myname_alt in ("HISA", "HISB", "HIE", "HID", "HIS", "HIP"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4176,7 +4328,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break
 	       if myname == "CYS" or myname == "CYM" or myname == "CYT":
 		  for myname_alt in ("CYS2", "CYX", "CYN", "F3G", "CYS", "CYM", "CYT"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4193,7 +4345,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break
                if myname == "ALA":
 		  for myname_alt in ("ALA", "NALA", "NAL"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4210,7 +4362,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break
                if myname == "T2P" or myname == "TPO" or myname == "THR":
 		  for myname_alt in ("THR", "T2P", "TPO"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4227,7 +4379,7 @@ class ResidueChis:
                       if os.path.exists(xvg_fn) or os.path.exists(xvg_fn+".gz"): break
                if myname == "S2P" or myname == "SEP" or myname == "SER":
 		  for myname_alt in ("SER", "SEP", "S2P"):
-                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1): #phi/psi
+                      if(nchi == mynumchis + 2 or nchi == mynumchis + 1 or backbone_only == 1): #phi/psi
                           if(chi_num == 0):
                               xvg_fn = basedir+"run"+str(sequential_sim_num+1)+chi_dir+"phi"+myname_alt+res_num+".xvg"
                           if(chi_num == 1):
@@ -4881,7 +5033,8 @@ class ResidueChis:
       self.xvg_chidir = xvg_chidir
       self.xvg_resnum = xvg_resnum
       self.sequential_res_num = sequential_res_num
-      self.backbone_only, self.phipsi = backbone_only, phipsi
+      self.backbone_only = backbone_only
+      self.phipsi = phipsi
       self.max_num_chis = max_num_chis
       self.markov_samples = markov_samples
       coarse_discretize = None

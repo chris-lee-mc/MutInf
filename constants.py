@@ -8,6 +8,7 @@ my_extra_link_args={'gcc':['-lgomp -lpthread'], 'icc':['-liomp5 -lpthread'],  'i
 Circular_PCA = False #by default, don't do circular PCA
 
 SMALL = 0.000000001
+SMALLER = SMALL * 0.0000001
 REALLY_SMALL=SMALL*SMALL*SMALL*SMALL
 PI = 3.141592653589793238462643383279502884197
 TWOPI = 2 * PI
@@ -16,7 +17,9 @@ GAMMA_EULER = 0.57721566490153286060651209
 K_NEAREST_NEIGHBOR = 1
 CACHE_TO_DISK = False
 CORRECT_FOR_SYMMETRY = 1
-VERBOSE = 0
+VERBOSE = 3
+OUTPUT_DIH_SINGLET_HISTOGRAMS = True
+NO_GRASSBERGER = False
 OFF_DIAG = 1 #set to "1" to look at off-diagonal terms
 OUTPUT_DIAG = 1  #set to "1" to output flat files for diagonal matrix elements
 EACH_BOOTSTRAP_MATRIX = 1 #set to "1" to output flat files for each bootstrapped matrix
@@ -27,6 +30,99 @@ MAX_NEAREST_NEIGHBORS = 1 # up to k nearest neighbors
 NUM_LAGTIMES = 5000 # do up to N lagtimes in markov model
 OUTPUT_INDEPENDENT_MUTINF_VALUES = 0 
 PAD = 1 #padding for multithreaded arrays
+
+
+# Number of chi angles per residue
+NumChis = { "ALA":0, "CYS":1, "CYN":1, "CYX":2, "CY2":2, "CYM":1, "ASP":2, "AS4":2, "ASH":2, "GLU":3, "GL4": 3, "GLH":3, "PHE":2, 
+            "GLY":0, "HIS":2, "HIP":2, "HIE":2, "HID":2, "ILE":2, "LYS":4, "LYP":4, "LEU":2, "MET":3, "ASN":2, "GLN":3,
+            "PRO":1, #GF: can't find def for chi2; rosetta uses chi1 only,
+            "ARG":4, "SER":2, "THR":2, "VAL":1,"TRP":2, "TYR":2, "CTH":2, "F3G":1, 
+            "TPO":1, "T2P":1, "S2P":1, "SEP":1 ,  #g_chi doesn't give dihedrals for phosphorylated aa
+            "ACK":4, #acetyl-lysine   #ffAmber N and C termini next:
+            "NALA":0, "NCYS":1, "NCYN":1, "NCYX":1, "NCY2":2, "NASP":2, "NAS4":2, "NASH":2, "NGLU":3, "NGL4": 3, "NGLH":3, "NPHE":2, 
+            "NGLY":0, "NHIS":2, "NHIP":2, "NHIE":2, "NHID":2, "NILE":2, "NLYS":4, "NLYP":4, "NLEU":2, "NMET":3, "NASN":2, "NGLN":3,
+            "NPRO":1, "NARG":4, "NSER":2, "NTHR":2, "NVAL":1,"NTRP":2, "NTYR":2,
+            "CALA":0, "CCYS":1, "CCYN":1, "CCYX":1, "CCY2":2, "CASP":2, "CAS4":2, "CASH":2, "CGLU":3, "CGL4": 3, "CGLH":3, "CPHE":2, 
+            "CGLY":0, "CHIS":2, "CHIP":2, "CHIE":2, "CHID":2, "CILE":2, "CLYS":4, "CLYP":4, "CLEU":2, "CMET":3, "CASN":2, "CGLN":3,
+            "CPRO":1, "CARG":4, "CSER":2, "CTHR":2, "CVAL":1,"CTRP":2, "CTYR":2,
+            "PHI":1,"PSI":1 #these last two are for treating phi and psi as belonging to different residues for alanine tripeptide for example
+            } 
+
+#next is for pdb trajectories -- no -OH chis
+NumChis_Safe = { "ALA":0, "CYS":1, "CYN":1, "CYX":2, "CY2":2, "CYM":1, "ASP":2, "AS4":2, "ASH":2, "GLU":3, "GL4": 3, "GLH":3, "PHE":2, 
+            "GLY":0, "HIS":2, "HIP":2, "HIE":2, "HID":2, "ILE":2, "LYS":4, "LYP":4, "LEU":2, "MET":3, "ASN":2, "GLN":3,
+            "PRO":1, #GF: can't find def for chi2; rosetta uses chi1 only,
+            "ARG":4, "SER":1, "THR":1, "VAL":1,"TRP":2, "TYR":2, "CTH":2, "F3G":1, 
+            "TPO":1, "T2P":1, "S2P":1, "SEP":1 ,  #g_chi doesn't give dihedrals for phosphorylated aa
+            "ACK":4, #acetyl-lysine   #ffAmber N and C termini next:
+            "NALA":0, "NCYS":1, "NCYN":1, "NCYX":1, "NCY2":2, "NASP":2, "NAS4":2, "NASH":2, "NGLU":3, "NGL4": 3, "NGLH":3, "NPHE":2, 
+            "NGLY":0, "NHIS":2, "NHIP":2, "NHIE":2, "NHID":2, "NILE":2, "NLYS":4, "NLYP":4, "NLEU":2, "NMET":3, "NASN":2, "NGLN":3,
+            "NPRO":1, "NARG":4, "NSER":1, "NTHR":1, "NVAL":1,"NTRP":2, "NTYR":2,
+            "CALA":0, "CCYS":1, "CCYN":1, "CCYX":1, "CCY2":2, "CASP":2, "CAS4":2, "CASH":2, "CGLU":3, "CGL4": 3, "CGLH":3, "CPHE":2, 
+            "CGLY":0, "CHIS":2, "CHIP":2, "CHIE":2, "CHID":2, "CILE":2, "CLYS":4, "CLYP":4, "CLEU":2, "CMET":3, "CASN":2, "CGLN":3,
+            "CPRO":1, "CARG":4, "CSER":1, "CTHR":1, "CVAL":1,"CTRP":2, "CTYR":2,
+            } 
+
+TorsionAtoms = { "ALA":[" CB "],
+                 "CYS":[" CB ", " SG "],
+                 "CYX":[" CB ", " SG "],
+                 "CYN":[" CB ", " SG "],
+                 "CYM":[" CB ", " SG "],
+                 "ASP":[" CB ", " CG "],
+                 "ASH":[" CB ", " CG "],
+                 "GLU":[" CB ", " CG "," CD "],
+                 "GLH":[" CB ", " CG "," CD "],
+                 "HIS":[" CB ", " CG "],
+                 "ILE":[" CB ", " CG1"],
+                 "LEU":[" CB ", " CG "],
+                 "LYS":[" CB ", " CG ", " CD "," CE "],
+                 "LYP":[" CB ", " CG ", " CD "," CE "],
+                 "MET":[" CB ", " CG ", " SD "],
+                 "PHE":[" CB ", " CG "],
+                 "PRO":[" CB ", " CG "],
+                 "PTR":[" CB ", " CG "],
+                 "SER":[" CB ", " OG "],
+                 "S2P":[" CB ", " OG "],
+                 "SEP":[" CB ", " CG "],
+                 "THR":[" CB ", " OG1"],
+                 "TPO":[" CB ", " CG "],
+                 "T2P":[" CB ", " OG1"],
+                 "TRP":[" CB ", " CG "],
+                 "TYR":[" CB ", " CG "],
+                 "TYP":[" CB ", " CG "],
+                 "VAL":[" CB ", " CG1"] 
+                 }
+
+TorsionAtoms2 = { "ALA":["_CB_"],
+                 "CYS":["_CB_", "_SG_"],
+                 "CYX":["_CB_", "_SG_"],
+                 "CYN":["_CB_", "_SG_"],
+                 "CYM":["_CB_", "_SG_"],
+                 "ASP":["_CB_", "_CG_"],
+                 "ASH":["_CB_", "_CG_"],
+                 "GLU":["_CB_", "_CG_","_CD_"],
+                 "GLH":["_CB_", "_CG_","_CD_"],
+                 "HIS":["_CB_", "_CG_"],
+                 "ILE":["_CB_", "_CG1"],
+                 "LEU":["_CB_", "_CG_"],
+                 "LYS":["_CB_", "_CG_", "_CD_","_CE_"],
+                 "LYP":["_CB_", "_CG_", "_CD_","_CE_"],
+                 "MET":["_CB_", "_CG_", "_SD_"],
+                 "PHE":["_CB_", "_CG_"],
+                 "PRO":["_CB_", "_CG_"],
+                 "PTR":["_CB_", "_CG_"],
+                 "SER":["_CB_", " OG "],
+                 "S2P":["_CB_", " OG "],
+                 "SEP":["_CB_", "_CG_"],
+                 "THR":["_CB_", " OG1"],
+                 "TPO":["_CB_", "_CG_"],
+                 "T2P":["_CB_", " OG1"],
+                 "TRP":["_CB_", "_CG_"],
+                 "TYR":["_CB_", "_CG_"],
+                 "TYP":["_CB_", "_CG_"],
+                 "VAL":["_CB_", "_CG1"] 
+                 }
+
 
 my_support_code = """
       #include <math.h>

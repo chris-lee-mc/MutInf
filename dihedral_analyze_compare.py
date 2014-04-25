@@ -318,18 +318,18 @@ if torsion_list[0] == "phi" and torsion_list[1] == "psi": #then make a ramachand
   #Make bar color be black
   #setp(ptc,"facecolor",'k')
   #No y ticks
-  setp(gca(), yticklabels=[])
+  plt.setp(plt.gca(), yticklabels=[])
 
   #Axes labels
   #Do xlabel only on the last row
   #if ct>=nplots-1:
-  xlabel('Phi (degrees)')
-  ylabel('Psi (degrees)')
+  plt.xlabel('Phi (degrees)')
+  plt.ylabel('Psi (degrees)')
   #Minimum/max at 180 degrees
-  xlim(-180,180)
+  plt.xlim(-180,180)
   #Labels at 90
-  xticks(arange(-180,180.1,90))
-  title(titlestr)
+  plt.xticks(arange(-180,180.1,90))
+  plt.title(titlestr)
   CB = plt.colorbar(l1, orientation='vertical',shrink=1.0)
   #CB.label
   
@@ -376,18 +376,18 @@ if torsion_list[0] == "phi" and torsion_list[1] == "psi": #then make a ramachand
   #Make bar color be black
   #setp(ptc,"facecolor",'k')
   #No y ticks
-  setp(gca(), yticklabels=[])
+  plt.setp(plt.gca(), yticklabels=[])
 
   #Axes labels
   #Do xlabel only on the last row
   #if ct>=nplots-1:
-  xlabel('Phi (degrees)')
-  ylabel('Psi (degrees)')
+  plt.xlabel('Phi (degrees)')
+  plt.ylabel('Psi (degrees)')
   #Minimum/max at 180 degrees
-  xlim(-180,180)
+  plt.xlim(-180,180)
   #Labels at 90
-  xticks(arange(-180,180.1,90))
-  title(titlestr)
+  plt.xticks(arange(-180,180.1,90))
+  plt.title(titlestr)
   plt.colorbar(l2, orientation='vertical',shrink=1.0)
   #plt.legend(bbox_to_anchor=(0., 1.00, 1., .100), loc=3,
   #     ncol=2, mode="expand", borderaxespad=0.)
@@ -396,12 +396,12 @@ if torsion_list[0] == "phi" and torsion_list[1] == "psi": #then make a ramachand
 
 f1.tight_layout()
 plotname="rama"+str(residueID_output)+'.eps'
-savefig(plotname)
+plt.savefig(plotname)
 os.system('ps2pdf'+' '+plotname)
 os.system('rm '+' '+plotname)
 
-clf()
-close()  #close figure
+plt.clf()
+plt.close()  #close figure
 
 ct = 0
 nplots=len(torsion_list)#+2.0*( torsion_list[0] == "phi" and torsion_list[1] == "psi")
@@ -522,11 +522,15 @@ for torsion in torsion_list :
       ys = density1(xs)
   
   if(symmetry==False):
-      xlim(-180,180)
+      plt.xlim(-180,180)
   else:
-      xlim(0,180)
+      plt.xlim(0,180)
   l1 = ax.plot(xs, ys, antialiased=True, linewidth=2, color="darkgreen",label=options.reference) #"#A81450")
-  
+  y1hist, edges1 = histogram(angles1, range=[-180,180], bins=int(360/binwidth), density=True)
+  y1vals = array(ys, float64)
+  print y1hist
+  print
+  print y1vals
 
   #ax.set_xlim(-180,180)
   density2 = gaussian_kde(angles2)
@@ -546,9 +550,45 @@ for torsion in torsion_list :
   #print ys
 
   l2 = ax.plot(xs, ys, antialiased=True, linewidth=2, color="tan",label=options.target) #"#E01B6A")
+  y2hist, edges2 = histogram(angles2, range=[-180,180], bins=int(360/binwidth), density=True)
+  y2vals = array(ys, float64)
+  print y2hist
+  print
+  print y2vals
   
   
+  flatname1=str(torsion)+residueID_output+'_temp_raw.txt'
+  smoothname1=str(torsion)+residueID_output+'_temp_smooth.txt'
+  flatname2=str(torsion)+residueID_output+'_targ_raw.txt'
+  smoothname2=str(torsion)+residueID_output+'_targ_smooth.txt'
+
+  binfile_res1_flat = open(flatname1,'w')
+  binfile_res2_flat = open(flatname2,'w')
+  binfile_res1_smooth = open(smoothname1,'w')
+  binfile_res2_smooth = open(smoothname2,'w')
+
+  binfile_res1_flat.write(str(nbins)+"\n")
+  binfile_res2_flat.write(str(nbins)+"\n")
+  binfile_res1_smooth.write(str(nbins)+"\n")
+  binfile_res2_smooth.write(str(nbins)+"\n")
+
+  for i in range(nbins):
+      binfile_res1_flat.write(str(y1hist[i])+"\n")
+      binfile_res2_flat.write(str(y2hist[i])+"\n")
+      binfile_res1_smooth.write(str(y1vals[i])+"\n")
+      binfile_res2_smooth.write(str(y2vals[i])+"\n")
+
+
+  binfile_res1_flat.close()
+  binfile_res2_flat.close()
+  binfile_res1_smooth.close()
+  binfile_res2_smooth.close()
+    
   
+        
+
+        
+
   #l1 = ax.plot(xs, ys, antialiased=True, linewidth=2, color="#A81450")
   #l1 = ax.fill_between(xs, ys, alpha=.5, zorder=5, antialiased=True, color="#E01B6A")
 
@@ -599,23 +639,23 @@ for torsion in torsion_list :
   #Axes labels
   #Do xlabel only on the last row
   if ct>=nplots-1:
-    xlabel('Angle (degrees)')
+    plt.xlabel('Angle (degrees)')
   if(options.pmf == "no"):
       #No y ticks
-      setp(gca(), yticklabels=[])
-      ylabel('Probability')
+      plt.setp(plt.gca(), yticklabels=[])
+      plt.ylabel('Probability')
   else:
       yrange = max(ys) - min(ys)
-      ylim(min(ys), max(ys))
-      yticks(arange(min(ys),max(ys),yrange))
-      ylabel('Potential of Mean Force, kcal/mol')
+      plt.ylim(min(ys), max(ys))
+      plt.yticks(arange(min(ys),max(ys),yrange))
+      plt.ylabel('Potential of Mean Force, kcal/mol')
   #Minimum/max at 180 degrees
   if(symmetry==False):
-      xlim(-180,180)
-      xticks(arange(-180,180.1,90))
+      plt.xlim(-180,180)
+      plt.xticks(arange(-180,180.1,90))
   else:
-      xlim(0, 180)
-      xticks(arange(0,180.1,45))
+      plt.xlim(0, 180)
+      plt.xticks(arange(0,180.1,45))
   #Labels at 90
   
   
@@ -641,12 +681,13 @@ bottom = 0.1   # the bottom of the subplots of the figure
 top = 0.9      # the top of the subplots of the figure
 wspace = 0.2   # the amount of width reserved for blank space between subplots
 hspace = 0.75   # the amount of height reserved for white space between subplots
-subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
 #plotname=pname+res+'.eps'
 #plotname=pname+residueID_output+'.eps'
 #just call it chi even if the residue only has phi and psi
 plotname="chi"+residueID_output+'.eps'
-savefig(plotname)
+
+plt.savefig(plotname)
 os.system('ps2pdf'+' '+plotname)
 os.system('rm '+' '+plotname)
 #show()

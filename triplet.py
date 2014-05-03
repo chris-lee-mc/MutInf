@@ -354,7 +354,7 @@ def calc_triplet_mutinf_markov_independent( nbins, chi_counts1_markov, chi_count
             mysign1 = 1.0L - 2*(counts12 % 2); // == -1 if it is odd, 1 if it is even
             dig1 = xDiGamma_Function(counts12);
             counts12d = 1.0 * counts12;
-            *(ent_1_2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALL)) ; 
+            *(ent_1_2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += -1.0 * ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALL)) ; 
            }
            
           counts23 = *(count_matrix_triplet_markov_2_3  + (long)( mybootstrap*(markov_samples)*nbins*nbins   +  markov_chain*nbins*nbins  +  bin1*nbins + bin2 ));
@@ -363,7 +363,7 @@ def calc_triplet_mutinf_markov_independent( nbins, chi_counts1_markov, chi_count
             mysign1 = 1.0L - 2*(counts23 % 2); // == -1 if it is odd, 1 if it is even
             dig1 = xDiGamma_Function(counts23);
             counts23d = 1.0 * counts23;
-            *(ent_2_3_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts23d / mynumangles)*(log((double)counts23d / mynumangles + SMALL)) ; 
+            *(ent_2_3_boots + (long)(mybootstrap*markov_samples + markov_chain)) += -1.0 * ((double)counts23d / mynumangles)*(log((double)counts23d / mynumangles + SMALL)) ; 
            }
            
           counts13 = *(count_matrix_triplet_markov_1_3  + (long)( mybootstrap*(markov_samples)*nbins*nbins   +  markov_chain*nbins*nbins  +  bin1*nbins + bin2 ));
@@ -373,7 +373,7 @@ def calc_triplet_mutinf_markov_independent( nbins, chi_counts1_markov, chi_count
             mysign1 = 1.0L - 2*(counts13 % 2); // == -1 if it is odd, 1 if it is even
             dig1 = xDiGamma_Function(counts13);
             counts13d = 1.0 * counts13;
-            *(ent_1_3_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts13d / mynumangles)*(log((double)counts13d / mynumangles + SMALL)) ; 
+            *(ent_1_3_boots + (long)(mybootstrap*markov_samples + markov_chain)) += -1.0 * ((double)counts13d / mynumangles)*(log((double)counts13d / mynumangles + SMALL)) ; 
            }
            
 
@@ -400,7 +400,7 @@ def calc_triplet_mutinf_markov_independent( nbins, chi_counts1_markov, chi_count
                   dig1 = xDiGamma_Function(counts1);
                   mysign1 = 1 - 2*(counts1 % 2); // == -1 if it is odd, 1 if it is even
                   counts1d = 1.0 * counts1 ;
-                  *(ent_1_2_3_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
+                  *(ent_1_2_3_boots + (long)(mybootstrap*markov_samples + markov_chain)) += -1.0 * ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
                 }
                
            }
@@ -1286,7 +1286,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                        dig1 = xDiGamma_Function(counts1);
                        mysign1 = 1 - 2*(counts1 % 2); // == -1 if it is odd, 1 if it is even
                        counts1d = 1.0 * counts1 ;
-                       *(ent_1_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
+                       *(ent_1_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
                      }
 
                counts2 = *(count_matrix_2 + (long)(mybootstrap*(total_permutations)*nbins + permut*nbins + bin1)) ;
@@ -1300,7 +1300,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                        dig1 = xDiGamma_Function(counts2);
                        mysign1 = 1 - 2*(counts2 % 2); // == -1 if it is odd, 1 if it is even
                        counts1d = 1.0 * counts2 ;
-                       *(ent_2_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
+                       *(ent_2_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
                      }
                
                counts3 = *(count_matrix_3 + (long)(mybootstrap*(total_permutations)*nbins + permut*nbins + bin1)) ;
@@ -1313,7 +1313,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                        dig1 = xDiGamma_Function(counts3);
                        mysign1 = 1 - 2*(counts3 % 2); // == -1 if it is odd, 1 if it is even
                        counts1d = 1.0 * counts3 ;
-                       *(ent_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
+                       *(ent_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALL)); 
                      }
   
              
@@ -1332,7 +1332,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                  mysign1 = 1.0L - 2*(counts12 % 2); // == -1 if it is odd, 1 if it is even
                  dig1 = xDiGamma_Function(counts12);
                  counts12d = 1.0 * counts12;
-                 *(ent_1_2_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALL)); 
+                 *(ent_1_2_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALL)); 
                 }
 
                counts23 = *(count_matrix_2_3  + (long)( mybootstrap*((total_permutations))*nbins*nbins   +  permut*nbins*nbins  +  bin1*nbins + bin2 ));
@@ -1341,7 +1341,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                  mysign1 = 1.0L - 2*(counts23 % 2); // == -1 if it is odd, 1 if it is even
                  dig1 = xDiGamma_Function(counts23);
                  counts23d = 1.0 * counts23;
-                 *(ent_2_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts23d / mynumangles)*(log((double)counts23d / mynumangles + SMALL)); 
+                 *(ent_2_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts23d / mynumangles)*(log((double)counts23d / mynumangles + SMALL)); 
                 }
 
                counts13 = *(count_matrix_1_3  + (long)( mybootstrap*((total_permutations))*nbins*nbins   +  permut*nbins*nbins  +  bin1*nbins + bin2 ));
@@ -1350,7 +1350,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                  mysign1 = 1.0L - 2*(counts13 % 2); // == -1 if it is odd, 1 if it is even
                  dig1 = xDiGamma_Function(counts13);
                  counts13d = 1.0 * counts13;
-                 *(ent_1_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts13d / mynumangles)*(log((double)counts13d / mynumangles + SMALL)); 
+                 *(ent_1_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts13d / mynumangles)*(log((double)counts13d / mynumangles + SMALL)); 
                 }
 
 
@@ -1377,7 +1377,7 @@ def calc_triplet_mutinf_corrected(chi_counts1, chi_counts2, chi_counts3, bins1, 
                        dig123 = xDiGamma_Function(counts123);
                        mysign123 = 1 - 2*(counts123 % 2); // == -1 if it is odd, 1 if it is even
                        counts123d = 1.0 * counts123 ;
-                       *(ent_1_2_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += ((double)counts123d / mynumangles)*(log((double)counts123d / mynumangles + SMALL)); 
+                       *(ent_1_2_3_boots + (long)(mybootstrap*(total_permutations) + permut)) += -1.0 * ((double)counts123d / mynumangles)*(log((double)counts123d / mynumangles + SMALL)); 
                      }
 
                 }

@@ -1788,7 +1788,7 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
       """
 
     code_no_grassberger = """
-    // weave6_markov
+    <// weave6_markov
     // bins dimensions: bootstrap_sets * markov_samples * bootstrap_choose * max_num_angles
      #include <math.h>
 
@@ -1849,7 +1849,7 @@ def calc_mutinf_markov_independent( nbins, chi_counts1_markov, chi_counts2_marko
            
            
            counts12d = 1.0 * counts12;
-           *(ent_1_2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALLER)); 
+           *(ent_1_2_boots + (long)(mybootstrap*markov_samples + markov_chain)) += -1.0 * ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALLER)); 
            }
           }
          }
@@ -2627,7 +2627,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
                 
                 
                 counts1d = 1.0 * counts1;
-                *(ent_1_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALLER));
+                *(ent_1_boots + (long)(mybootstrap*(permutations + 1) + permut)) += -1.0 * ((double)counts1d / mynumangles)*(log((double)counts1d / mynumangles + SMALLER));
               }
 
              if(markov_interval[mybootstrap] < 2) {
@@ -2647,7 +2647,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
                 
                 
                 counts2d = 1.0 * counts2;
-                *(ent_2_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts2d / mynumangles)*(log((double)counts2d / mynumangles + SMALLER)); 
+                *(ent_2_boots + (long)(mybootstrap*(permutations + 1) + permut)) += -1.0 * ((double)counts2d / mynumangles)*(log((double)counts2d / mynumangles + SMALLER)); 
               }
 
 
@@ -2666,7 +2666,7 @@ def calc_mutinf_corrected(chi_counts1, chi_counts2, bins1, bins2, chi_counts_seq
                 
                 
                 counts12d = 1.0 * counts12;
-                *(ent_1_2_boots + (long)(mybootstrap*(permutations + 1) + permut)) += ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALLER)); 
+                *(ent_1_2_boots + (long)(mybootstrap*(permutations + 1) + permut)) += -1.0 * ((double)counts12d / mynumangles)*(log((double)counts12d / mynumangles + SMALLER)); 
               }
             }
          }

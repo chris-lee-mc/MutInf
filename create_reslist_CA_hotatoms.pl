@@ -50,7 +50,7 @@ while($resline = <STRUCTFILE>)
     $resname =~ s/\s+//;
     $resnum =~ s/\s+//;
     if($resname =~ /ACE|NMA/) { next; }
-    if($resname =~ /HIE/ || $resname =~ /HIP/ || $resname =~ /HID/ || $resname =~ /HSD/ || $resname =~ /HSE/ ) { $resname = "HIS"; }
+    if($resname =~ /HIE/ || $resname =~ /HIP/ || $resname =~ /HID/) { $resname = "HIS"; }
     if($resname =~ /F3G/) { $resname = "CYS";}
     if($resname =~ /SEP/) { $resname = "SER";}
     if($resname =~ /TYS/) { $resname = "TYR";}
@@ -79,9 +79,7 @@ while($resline = <STRUCTFILE>)
 	$altname = "HIE";
 	$altname2 = "HID";
 	$altname3 = "HIP";
-	$altname4 = "HSD";
-	$altname5 = "HSE";
-	print "looking also for HIE or HID or HSD or HSE or HIP\n";
+	print "looking also for HIE or HID\n";
     }
     else
     {
@@ -89,7 +87,7 @@ while($resline = <STRUCTFILE>)
 	$altname2 = $resname;
     }
 #    $altname = $resname;
-    while(!($match_files[0] =~ /phi${resname}${gchi_counter}.xvg/ || $match_files2[0] =~ /phi${altname}${gchi_counter}.xvg/ || $match_files3[0] =~ /phi${altname2}${gchi_counter}.xvg/ || $match_files4[0] =~ /phi${altname3}${gchi_counter}.xvg/  || $match_files5[0] =~ /phi${altname3}${gchi_counter}.xvg/  || $match_files6[0] =~ /phi${altname3}${gchi_counter}.xvg/ )) #while no files match
+    while(!($match_files[0] =~ /phi${resname}${gchi_counter}.xvg/ || $match_files2[0] =~ /phi${altname}${gchi_counter}.xvg/ || $match_files3[0] =~ /phi${altname2}${gchi_counter}.xvg/ || $match_files4[0] =~ /phi${altname3}${gchi_counter}.xvg/ )) #while no files match
     {
 	$gchi_counter++;
 	print("counter: $gchi_counter\n");
@@ -112,9 +110,12 @@ while($resline = <STRUCTFILE>)
 		last;
 	    }
     }
+    $chain =~ s/ //;
     print "${gchi_counter} ${resname} ${resnum}${chain}\n";
-    print RESFILE "${gchi_counter} ${resname} ${resnum}${chain}\n";
-
+    print RESFILE "${gchi_counter} ${resname} ${resnum}\n";
+    $g_chi_counter += 1;
+    print RESFILE "${gchi_counter} ${resname} ${resnum}${chain}S\n";
+    $g_chi_counter += 1;
 }
 close RESFILE;
 

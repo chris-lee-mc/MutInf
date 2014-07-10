@@ -86,7 +86,7 @@ Note that units are as in xvg file (normall kJ/mol for energies from GROMACS)
    if(skip == 1):
        extra_record = 0
    else:
-       extra_record = 1
+       extra_record = 0
    dataarray=zeros((int((inlength-skip_over_steps)/skip) + extra_record,numfields),float64) #could start with zero, so add + extra_record
    
    skiplines=0
@@ -284,6 +284,119 @@ def output_timescales_chis(myfilename_prefix,myreslist,rownames, nsims = 6, nchi
           myfile.write("\n")
    
    myfile.close()
+
+   return timescales_chis
+
+def output_conv_bb_sc_boots(myfilename_prefix,myreslist,bootstrap_sets,rownames, nsims = 6, nchi=6 ):  ## NOTE: ASSUMES RESIDUE NUMBER STARTS AT 1 AND ALL RESIDUES SEQUENTIAL
+   #print "shape of matrix to ouput:"+str(mymatrix.shape)+"\n"
+   
+   timescales_chis = zeros((bootstrap_sets, len(myreslist), 2 ), float64) #initialize  mc, sc
+   timescales_chis = zeros((bootstrap_sets, len(myreslist), 2 ), float64) #initialize  mc, sc
+   timescales_stdevs_chis = zeros((bootstrap_sets, len(myreslist), 2 ), float64) #initialize  mc, sc
+   RYG_timescales = zeros((bootstrap_sets, len(myreslist), 2 ), int8)  #green -- converged > 10 tau, yellow -- almost  1-10 tau,  red -- not converged
+   #self.angles = zeros((self.nchi,num_sims,max_angles),float64)         # the dihedral angles
+
+   for mybootstrap in range(bootstrap_sets):
+      numangles_this_bootstrap = myreslist[0].numangles_bootstrap[mybootstrap]
+      nextbootstrap = mybootstrap+1
+      minbootstrap = max(mybootstrap-3, 0)
+      for res_ind1, myres1 in zip(range(len(myreslist)), myreslist):
+                       #print "\n#### Working on residue %s (%s):" % (myres1.num, myres1.name) , utils.flush()
+                       for mc_sc in range(2):
+                              #print "%s chi: %d/%d" % (myres1.name,int(myres1.num),mychi1+1)
+                              #print "res_ind1: "+str(res_ind1)
+                              #rint "mychi1: "+str(mychi1)
+                              #print "nchi: " +str(nchi)
+                              #print "res_ind1 * nchi + mychi1: "+str(res_ind1 * nchi + mychi1)
+                              #print "myres1.angles: "
+                              #print myres1.angles
+                              #print "angle entries: "
+                              #print myres1.angles[mychi1, :, :min_num_angles]
+                              if(mc_sc == 0):
+                                 timescales_chis[mybootstrap, res_ind1,  mc_sc ] = amax(amax(myres1.slowest_implied_timescale[0:1,minbootstrap:nextbootstrap], axis=1),axis=0) #max of the slowest implied timescales over this and previous three bootstraps
+                                 timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] = amax(std(myres1.slowest_implied_timescale[0:1,minbootstrap:nextbootstrap],axis=1),axis=0)  #
+                              if(mc_sc == 1):
+                                 try: #if it has a sidechain
+                                    timescales_chis[mybootstrap, res_ind1,  mc_sc ] = amax(amax(myres1.slowest_implied_timescale[2:,minbootstrap:nextbootstrap],axis=1),axis=0) #max of the slowest implied timescales over this and previous three bootstraps
+                                    timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] = amax(std(myres1.slowest_implied_timescale[2:,minbootstrap:nextbootstrap],axis=1),axis=0)  #
+                                 except:
+                                    timescales_chis[mybootstrap, res_ind1,  mc_sc ] = 0
+                                    timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] = 0
+                                    
+                              #color by convergence based on slowest implied timescale
+                              if(numangles_this_bootstrap >= 10 * timescales_chis[mybootstrap, res_ind1, mc_sc] and (timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] / timescales_chis[mybootstrap, res_ind1, mc_sc] < 0.1 ) ) : #within 10%
+                                 RYG_timescales[mybootstrap, res_ind1, mc_sc ] = 3 # "green"
+                              elif(numangles_this_bootstrap >= 10 * timescales_chis[mybootstrap, res_ind1, mc_sc] and (timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] / timescales_chis[mybootstrap, res_ind1, mc_sc] < 0.2 ) ): #within 20%
+                                 RYG_timescales[mybootstrap, res_ind1, mc_sc ] = 5 # "cyan"
+                              elif(numangles_this_bootstrap >= 10 * timescales_chis[mybootstrap, res_ind1, mc_sc] and (timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] / timescales_chis[mybootstrap, res_ind1, mc_sc] < 0.4 ) ): #within 40%
+                                 RYG_timescales[mybootstrap, res_ind1, mc_sc ] = 6 # "yellow"
+                              elif(numangles_this_bootstrap >= 10 * timescales_chis[mybootstrap, res_ind1, mc_sc] and (timescales_stdevs_chis[mybootstrap, res_ind1, mc_sc] / timescales_chis[mybootstrap, res_ind1, mc_sc] < 0.8 ) ): #within 80%
+                                 RYG_timescales[mybootstrap, res_ind1, mc_sc ] = 13 # "orange"
+                              else:
+                                 RYG_timescales[mybootstrap, res_ind1, mc_sc ] = 4 # "red"
+                                 
+
+      myfile = open(myfilename_prefix + "_" + str(mybootstrap) + ".txt",'w')
+      mypml = open(myfilename_prefix + "_" + str(mybootstrap) + ".pml",'w')
+      mypse = open(myfilename_prefix + "_" + str(mybootstrap) + ".pse",'w')
+      for row_num, row_name in zip(range(len(rownames)), rownames):
+          myfile.write(str(row_name) + " ")
+          for col_chi in range(2): #mainchain, sidechain 
+                 myfile.write(str(RYG_timescales[mybootstrap, row_num, col_chi ] ))
+                 myfile.write(" ")
+          myfile.write("\n")
+
+      for row_num, row_name in zip(range(len(rownames)), rownames):
+          #myfile.write(str(row_name) + " ")
+          #for col_chi in range(2): #mainchain, sidechain 
+          mypml.write("color "+str(int(RYG_timescales[mybootstrap, row_num, 0 ]) )+",resi "+str(row_num)+" and n;ca,c,n,o,h" ) #mainchain
+          mypml.write("\n")
+          mypml.write("color "+str(int(RYG_timescales[mybootstrap, row_num, 1 ]) )+",resi "+str(row_num)+" and !(n;c,o,h|(n. n&!r. pro))" ) #sidechain
+          mypml.write("\n")
+   
+      mypml.write("cmd.bg_color('white') \n")
+      mypml.write("cmd.show('cartoon'   ,'all') \n")
+      mypml.write("cmd.show('sticks','((byres (all))&(!(n;c,o,h|(n. n&!r. pro))))') \n")
+      mypml.write("cmd.hide('((byres (all))&(n. c,o,h|(n. n&!r. pro)))') \n")
+      mypml.write("cmd.hide('(hydro and (elem c extend 1))') \n")
+      mypml.write("save "+str(mypse)+",format=pse \n")
+      mypml.write("cmd.set('session_changed',0) \n")
+
+      myfile.close()
+      mypml.close()
+   return timescales_chis
+
+def output_timescales_chis_boots(myfilename_prefix,myreslist,bootstrap_sets,rownames, nsims = 6, nchi=6 ):
+   #print "shape of matrix to ouput:"+str(mymatrix.shape)+"\n"
+   min_num_angles = min(myreslist[0].numangles)
+   timescales_chis = zeros((bootstrap_sets, len(myreslist), nchi ), float64) #initialize
+   #self.angles = zeros((self.nchi,num_sims,max_angles),float64)         # the dihedral angles
+
+   for mybootstrap in range(bootstrap_sets):
+      for res_ind1, myres1 in zip(range(len(myreslist)), myreslist):
+                       #print "\n#### Working on residue %s (%s):" % (myres1.num, myres1.name) , utils.flush()
+                       for mychi1 in range(myres1.nchi):
+                              #print "%s chi: %d/%d" % (myres1.name,int(myres1.num),mychi1+1)
+                              #print "res_ind1: "+str(res_ind1)
+                              #rint "mychi1: "+str(mychi1)
+                              #print "nchi: " +str(nchi)
+                              #print "min_num_angles: "+str(min_num_angles)
+                              #print "res_ind1 * nchi + mychi1: "+str(res_ind1 * nchi + mychi1)
+                              #print "myres1.angles: "
+                              #print myres1.angles
+                              #print "angle entries: "
+                              #print myres1.angles[mychi1, :, :min_num_angles]
+                              timescales_chis[mybootstrap, res_ind1,  mychi1 ] = myres1.slowest_implied_timescale[mychi1,mybootstrap] 
+                              
+      myfile = open(myfilename_prefix + "_" + str(mybootstrap) + ".txt",'w')
+      for row_num, row_name in zip(range(len(rownames)), rownames):
+          myfile.write(str(row_name) + " ")
+          for col_chi in range(nchi):  
+                 myfile.write(str(timescales_chis[mybootstrap, row_num, col_chi ] ))
+                 myfile.write(" ")
+          myfile.write("\n")
+   
+      myfile.close()
 
    return timescales_chis
 
@@ -551,6 +664,40 @@ def output_timescales_angles_autocorr_chis(myfilename_prefix,myreslist,rownames,
 
    return autotimes_chis
 
+def output_timescales_angles_autocorr_chis_boots(myfilename_prefix,myreslist,bootstrap_sets, rownames, nsims = 6, nchi=6 ):
+#print "shape of matrix to ouput:"+str(mymatrix.shape)+"\n"
+   min_num_angles = min(myreslist[0].numangles)
+   autotimes_chis = zeros((bootstrap_sets, len(myreslist), nchi ), float64) #initialize
+   #self.angles = zeros((self.nchi,num_sims,max_angles),float64)         # the dihedral angles
+   
+   for mybootstrap in range(bootstrap_sets):
+      for res_ind1, myres1 in zip(range(len(myreslist)), myreslist):
+                       #print "\n#### Working on residue %s (%s):" % (myres1.num, myres1.name) , utils.flush()
+                       for mychi1 in range(myres1.nchi):
+                              #print "%s chi: %d/%d" % (myres1.name,int(myres1.num),mychi1+1)
+                              #print "res_ind1: "+str(res_ind1)
+                              #rint "mychi1: "+str(mychi1)
+                              #print "nchi: " +str(nchi)
+                              #print "min_num_angles: "+str(min_num_angles)
+                              #print "res_ind1 * nchi + mychi1: "+str(res_ind1 * nchi + mychi1)
+                              #print "myres1.angles: "
+                              #print myres1.angles
+                              #print "angle entries: "
+                              #print myres1.angles[mychi1, :, :min_num_angles]
+                              autotimes_chis[mybootstrap, res_ind1,  mychi1 ] = myres1.angles_autocorr_time[mychi1,mybootstrap] 
+                              
+      myfile = open(myfilename_prefix + "_" + str(mybootstrap) + ".txt",'w')
+      for row_num, row_name in zip(range(len(rownames)), rownames):
+          myfile.write(str(row_name) + " ")
+          for col_chi in range(nchi):  
+                 myfile.write(str(autotimes_chis[mybootstrap, row_num, col_chi ] ))
+                 myfile.write(" ")
+          myfile.write("\n")
+      
+      myfile.close()
+
+   return autotimes_chis
+
 def output_timescales_mutinf_autocorr_chis_max(myfilename_prefix,myreslist,rownames, nsims = 6, nchi=6 ):
    #print "shape of matrix to ouput:"+str(mymatrix.shape)+"\n"
    min_num_angles = min(myreslist[0].numangles)
@@ -622,6 +769,28 @@ def output_matrix_chis_2dhists(myfilename,mymatrix,rownames,colnames, nchi=6, nb
                                 #print mymatrix[row_num,col_num,row_chi,col_chi,bin_i,bin_j]
                                 myfile.write(str(mymatrix[row_num,col_num,row_chi,col_chi,bin_i,bin_j]))
                             myfile.write(" ")
+              myfile.write("\n") #newline before next row
+    myfile.close()
+
+
+def output_2dhist(myfilename,mymatrix,row_name, col_name, nbins = 12,  zero_diag=False):
+    myfile = open(myfilename,'w')
+    #print "shape of matrix to ouput:"+str(mymatrix.shape)+"\n"
+
+    for bin_j in range(nbins):
+       myfile.write(col_name +  "_" + str(bin_j) + " ")
+    
+    myfile.write("\n") 
+
+    for bin_i in range(nbins):
+              myfile.write(row_name + "_" + str(bin_i) + " ")
+              for bin_j in range(nbins):
+                 
+                           
+                 #print row_num, col_num, row_chi, col_chi, bin_i, bin_j 
+                 #print mymatrix[row_num,col_num,row_chi,col_chi,bin_i,bin_j]
+                 myfile.write(str(mymatrix[bin_i,bin_j]))
+                 myfile.write(" ")
               myfile.write("\n") #newline before next row
     myfile.close()
 

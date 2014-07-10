@@ -386,6 +386,14 @@ class PDBResidue:
             chis[2] = periodic_range(chis[2], 180)
 
         return num.array(chis)
+    
+    def get_xyz_matrix(self, name):
+        dat = []
+	atom = res.get_atom(name)
+	if atom == None: xyz = [num.nan,num.nan,num.nan]
+	else: xyz = [atom.x, atom.y, atom.z]
+	dat.append(xyz)
+        return num.array(dat, 'd')
 
     def calc_rmsd(self, res2, atom_names=None):
         sum, count = 0., 0.

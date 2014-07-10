@@ -303,9 +303,9 @@ def filter_div(div_ref, div_ref2, div1, correct="yes"):
             #print "deltS null hyp:  "+str(kldiv_null_hyp_ref)
             print "deltS null hyp samples > target: "+str(dS_num_greater_than_ref)
             #print "deltS corrected: "+str(div1.kldiv_res[counter,:,mychi]) + " bias: "+str( kldiv_null_hyp_ref) #assume no bias here since entropy changes can go up or down
-            if(kldiv_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
+            if(dS_num_greater_than_ref/bootstrap_sets > div1.sigalpha):
                 div1.dS_res[counter,:,mychi] = 0 #zero all bootstrap_sets if it is filtered out. Hope variance is zero-safe
-                print "this torsion's KL divergence was not significant."
+                print "this torsion's dS was not significant."
             else:
                 #remove bias due to kldiv of reference with respect to itself
                 print "significant deltaS "
@@ -316,6 +316,9 @@ def filter_div(div_ref, div_ref2, div1, correct="yes"):
        counter += 1 
 
 
+
+ 
+    
 
  #########################################################################################################################################
  ###  Class KLdiv: computes Kullback-Leibler Divergence Expansion first and second-order terms for all residues given two residue lists
@@ -378,11 +381,29 @@ class KLdiv:
         counter1 = 0
         numchain_re = re.compile(r'\s*([0-9]+)([A-Z]*).*')
         numchain_re2 = re.compile(r'\s*([0-9]+).*')
+        chain_re = re.compile(r'\s*([A-Z]+)')
+        
+        
+        #first, zero b-factors
+        for chain in model:
+                    print "chain name: "+str(chain.id)
+                    mymatch = chain_re.match(str(chain.id))
+                    if mymatch == None: #if empty chain name, make it chain X
+                       chain.id = "X"   
+                       print "empy chain name, changing to new chain name: "+str(chain.id)
+                    for atom in chain[int(resnum)]:
+                        print "atom: "+str(atom.id)
+                        atom.bfactor = 0.0
+
+
         for res1 in self.reslist1:
             test = None
-            
-            print "numchain: "+str(res1.num)+str(res1.chain)+" resname: "+str(res1.name)
-            mymatch = numchain_re.match(str(res1.num)+str(res1.chain))
+            this_res1_chain = res1.chain
+            mymatch = chain_re.match(str(this_res1_chain))
+            if mymatch == None: #if empty chain name, make it chain X
+                       this_res1_chain = "X"   
+            print "numchain: "+str(res1.num)+str(this_res1_chain)+" resname: "+str(res1.name)
+            mymatch = numchain_re.match(str(res1.num)+str(this_res1_chain))
             if mymatch != None:
                 (resnum, reschain) = mymatch.groups()
                 print "match: "+str(res1.num)+" "+str(resnum)
@@ -404,7 +425,11 @@ class KLdiv:
                             break #no need to consider next chain
                         else:
                             print "did not match"
-                except:
+                except Exception as inst:
+                    print "Exception in trying to match"
+                    print type(inst)
+                    print inst.args
+                    print inst
                     print "did not match"
             try:
                 if(test != None):
@@ -412,8 +437,12 @@ class KLdiv:
                     for atom in model[reschain][int(resnum)]:
                         print "atom: "+str(atom.id)
                         atom.bfactor = sum(average(replacements[counter1,:,:],axis=0))
-            except:
-                for chain in model:
+            except Exception as inst:
+               print "Exception in replacing bfactors"
+               print type(inst)
+               print inst.args
+               print inst
+               for chain in model:
                     print "empty chain name: "+str(chain.id)
                     for atom in chain[int(resnum)]:
                         print "atom: "+str(atom.id)
@@ -424,17 +453,270 @@ class KLdiv:
         w.set_structure(structure)
         w.save(outpdb)
             
+    def pymolfile_replace_bfac_res_tor(self, pymolfile, outpdb, delta=False):  #needs pdb already loaded       
+    
+         pymolfile.write( "from pymol import cmd \n" )
+         pymolfile.write( "load "+str(outpdb)+", system \n" )
+         pymolfile.write( "cmd.remove('(all) and hydro') \n")
+         pymolfile.write( "sele b0, b < 0.00001 and b > -0.00001 \n")
+         pymolfile.write( "cmd.show('sticks','((byres (system))&n)ca,c,n,o,h)') \n") #mainchain
+         pymolfile.write( "cmd.show('sticks','((byres (system))&(!(n)c,o,h|(n. n&!r. pro)))) and not b0')\n") #sidechain
+         pymolfile.write( "cmd.show('sticks','system and (not b0)')\n")
+         pymolfile.write( "cmd.hide('sticks'    ,'name O') \n ")
+         pymolfile.write( "cmd.hide('lines'    ,'name O') \n ")                       
+         pymolfile.write( "cmd.spectrum('b',selection=('system'),quiet=0) \n")
+         pymolfile.write( "cmd.color(5278, 'b0') \n")
+         pymolfile.write( "cmd.disable('b0')  \n")
+         pymolfile.write( "cmd.bg_color('white' ) \n") 
+
+         if(delta == True):
+            MutInf_Path = os.path.dirname(os.path.abspath(__file__))
+            pymolfile.write("run "+str(MutInf_Path)+"/color_b.py \n")
+            #pymolfile_dS.write("from pymol import cmd"+"\n")
+            #pymolfile_dS_tor.write("load "+str(dS_tor_pdbfile)+", system \n")
+            #pymolfile.write("preset.pretty('system')"+"\n")  #,_self=cmd"+"\n")
+            pymolfile.write("color_b(selection='b<0',gradient='bw',mode='hist')\n")
+            pymolfile.write("color_b(selection='b>0',gradient='wr',mode='hist')\n")
+            pymolfile.write("sele b0, b < 0.00001 and b > -0.00001 "+"\n")
+            pymolfile.write("cmd.color(5278, 'b0')"+"\n")
+            pymolfile.write("cmd.disable('b0')"+"\n")
+            #pymolfile.write("cmd.bg_color('white')"+"\n")
+
+         pymolstring = """
+
+         stored.list=[]
+         stored.list1=[]
+         stored.list2=[]
+         stored.list3=[]
+         cmd.iterate("(name ca)","stored.list1.append((resi,resn,color))")
+         cmd.iterate("(name n)","stored.list2.append((resi,resn,color))")
+         cmd.iterate("(name c)","stored.list3.append((resi,resn,color))")
+         #print stored.list
+
+         #python
+         i = 0
+
+         cmd.set_bond('stick_color', 5278 ,'system and (name C,N)')
+         python
+
+for resnum_name in stored.list1: 
+     cmd.select('this_res','resi '+str(resnum_name[0]))
+     print "this res: "+str(resnum_name[0])
+     cmd.select('this_res_N','this_res and name N')
+     cmd.select('this_res_CA','this_res and name CA')
+     cmd.select('this_res_C','this_res and name C')
+
+     try:
+       cmd.select('this_res_N','this_res and name N')
+       stored.temp_list=[]
+       cmd.iterate('this_res_N','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name N,CA)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name N,CA)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name N,CA)')
+       #print "coloring N-CA: "+str(stored.temp_list[0])
+     except IndexError:
+            pass
+     try:
+       cmd.select('this_res_C','this_res and name C')
+       stored.temp_list=[]
+       cmd.iterate('this_res_C','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CA,C)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CA,C)')
+
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CA,C)')
+       #print "coloring CA-C: "+str(stored.temp_list[0])
+     except IndexError:
+            pass
+
+     #cmd.set_bond('stick_color',stored.list2[i][2],'this_res and (name N,CA)')
+     #cmd.set_bond('stick_color',stored.list3[i][2],'this_res and (name CA,C)')
+
+     try:
+       cmd.select('this_res_CB','this_res and name CB')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CB','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CA,CB)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CA,CB)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CA,CB)')
+       print "coloring CA-CB: "+str(stored.temp_list[0])
+     except IndexError:
+            pass
+     try:	  
+       cmd.select('this_res_SG','this_res and name SG')
+       stored.temp_list=[]
+       cmd.iterate('this_res_SG','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,SG)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,SG)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,SG)')
+       print "coloring CB-SG: "+str(stored.temp_list[0])
+     except IndexError:
+            pass
+     try:
+       cmd.select('this_res_OG','this_res and name OG')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OG','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,OG)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,OG)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,OG)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_CG','this_res and name CG')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CG','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,CG)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,CG)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,CG)')
+       print "coloring CB-CG: "+str(stored.temp_list[0])
+
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_CG1','this_res and name CG1')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CG1','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,CG1)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,CG1)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,CG1)')
+     except IndexError:
+            pass
+     try:
+       cmd.select('this_res_CG2','this_res and name CG2')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CG2','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CB,CG2)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CB,CG2)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CB,CG2)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_OD1','this_res and name OD1')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OD1','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,OD1)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,OD1)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,OD1)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_OD2','this_res and name OD2')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OD2','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,OD2)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,OD2)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,OD2)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_CD','this_res and name CD')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CD','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,CD)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,CD)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,CD)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_SD','this_res and name SD')
+       stored.temp_list=[]
+       cmd.iterate('this_res_SD','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CG,SD)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CG,SD)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CG,SD)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_CE','this_res and name CE')
+       stored.temp_list=[]
+       cmd.iterate('this_res_CE','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,CE)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,CE)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,CE)')
+     except IndexError:
+            pass
+     try:
+       cmd.select('this_res_NE','this_res and name NE')
+       stored.temp_list=[]
+       cmd.iterate('this_res_NE','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,NE)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,NE)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,NE)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_OE1','this_res and name OE1')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OE1','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,OE1)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,OE1)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,OE1)')
+     except IndexError:
+            pass
+
+     try:
+       cmd.select('this_res_OE2','this_res and name OE2')
+       stored.temp_list=[]
+       cmd.iterate('this_res_OE2','stored.temp_list.append(color)')
+       cmd.set_bond('stick_color',stored.temp_list[0],'this_res and (name CD,OE2)')
+       cmd.set_bond('line_color',stored.temp_list[0],'this_res and (name CD,OE2)')
+       if(stored.temp_list[0] != 5278): #if not zero
+          cmd.show('sticks','this_res and (name CD,OE2)')
+     except IndexError:
+            pass
+
+     i += 1
+
+
+     python end
+
+              """
+         pymolfile.write(pymolstring)
 
     def replace_bfac_res_tor(self, replacements, structure, outpdb):        
         model = structure[0]
         counter1 = 0
         numchain_re = re.compile(r'\s*([0-9]+)([A-Z]*).*')
         numchain_re2 = re.compile(r'\s*([0-9]+).*')
+
+        #first, zero b-factors
+        for chain in model:
+                    print "empty chain name: "+str(chain.id)
+                    mymatch = chain_re.match(str(chain.id))
+                    if mymatch == None: #if empty chain name, make it chain X
+                       chain.id = "X"   
+                    print "empy chain name, changing to new chain name: "+str(chain.id)
+                    for atom in chain[int(resnum)]:
+                        print "atom: "+str(atom.id)
+                        atom.bfactor = 0.0
+
         for res1 in self.reslist1:
             test = None
-            
-            print "numchain: "+str(res1.num)+str(res1.chain)+" resname: "+str(res1.name)
-            mymatch = numchain_re.match(str(res1.num)+str(res1.chain))
+            this_res1_chain = res1.chain
+            print "numchain: "+str(res1.num)+str(this_res1_chain)+" resname: "+str(res1.name)
+            mymatch = numchain_re.match(str(res1.num)+str(this_res1_chain))
             if mymatch != None:
                 (resnum, reschain) = mymatch.groups()
                 print "match: "+str(res1.num)+" "+str(resnum)
@@ -455,7 +737,11 @@ class KLdiv:
                             test = 1
                         else:
                             print "did not match"
-                except:
+                except Exception as inst:
+                    print "Exception: in trying to match"
+                    print type(inst)
+                    print inst.args
+                    print inst
                     print "did not match"
             try:
                 if(test != None):
@@ -496,8 +782,13 @@ class KLdiv:
                         myres.CE.bfactor = average(replacements[counter1,:,5],axis=0) #give it Chi3's color
                     if(res1.name == "ARG"):
                         myres.NE.bfactor = average(replacements[counter1,:,5],axis=0) #give it Chi3's color
-
-            except:
+            except Exception as inst:
+                print "Exception: in trying to replace bfactors"
+                print type(inst)
+                print inst.args
+                print inst
+                
+                
                 for chain in model:
                     print "empty chain name: "+str(chain.id)
                     for atom in chain[int(resnum)]:
@@ -607,6 +898,8 @@ class KLdiv:
         pymolfile_ent1_tor = open(prefix+"_ent_ref_colortor.pml",'w')
         pymolfile_ent2_tor = open(prefix+"_ent_targ_colortor.pml",'w')
         pymolfile_dS_tor = open(prefix+"_ent_delta_colortor.pml",'w')
+        name_num_list1 = []
+        name_num_list2 = []
         PDB_input = self.run_params1.pdbfile
         # first, output data for each bootstrap separately
         bootstraps = self.bootstrap_sets
@@ -623,12 +916,31 @@ class KLdiv:
             sumfile_dS_boot = open(prefix+"_sum_ent_delta_bootstrap"+str(mybootstrap)+".txt",'w')
             counter1 = 0 #residue list counter
             for res1, res2 in zip(self.reslist1, self.reslist2):
+                dihcounter = 0
+                #First, output dihedral population file with the first line containing the number of bins and then subsequent lines with histogram populations
+                if OUTPUT_DIH_SINGLET_HISTOGRAMS == True:
+                  for mydih in ("phi", "psi", "chi1", "chi2", "chi3", "chi4"):  
+                   if sum(self.chi_pop_hist1_res[counter1,mybootstrap,dihcounter,:] > 0) and sum(self.chi_pop_hist2_res[counter1,mybootstrap,dihcounter,:] > 0):  #if we have data for these dihedrals
+                        binfile_res1_boot = open(prefix+"_"+str(mydih)+str(res1.name)+str(res1.num)+"_chi_pop_hist_ref_bootstrap"+str(mybootstrap)+".txt",'w')
+                        binfile_res1_boot.write(str(self.nbins)+"\n")
+                        for i in range(self.nbins):
+                           binfile_res1_boot.write(str(self.chi_pop_hist1_res[counter1,mybootstrap,dihcounter,i])+"\n")
+                        binfile_res1_boot.close()
+
+                        binfile_res2_boot = open(prefix+"_"+str(mydih)+str(res2.name)+str(res2.num)+"_chi_pop_hist_targ_bootstrap"+str(mybootstrap)+".txt",'w')
+                        binfile_res2_boot.write(str(self.nbins)+"\n"  )
+                        for i in range(self.nbins):
+                           binfile_res2_boot.write(str(self.chi_pop_hist2_res[counter1,mybootstrap,dihcounter,i])+"\n")
+                        binfile_res2_boot.close()
+
+                        dihcounter += 1
+                   
                 sumfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
                 sumfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.jsdiv_res[counter1,mybootstrap,:]))+"\n")
                 allfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.kldiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
                 allfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
-                sumfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
-                allfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
+                #sumfile_kl_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.kldiv_res[counter1,mybootstrap,:]))+"\n")
+                #allfile_js_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+fmt_floats(list((self.jsdiv_res[counter1,mybootstrap,:]).flatten()), digits=6, length=9)+"\n")
 
                 sumfile_ent1_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.ent1_res[counter1,mybootstrap,:]))+"\n")
                 sumfile_ent2_boot.write(str(res1.name)+str(res1.num)+str(res1.chain)+" "+str(sum(self.ent1_res[counter1,mybootstrap,:]))+"\n")
@@ -646,6 +958,8 @@ class KLdiv:
         counter1 = 0 #residue list counter
         for res1, res2 in zip(self.reslist1, self.reslist2):
             
+            name_num_list1.append(str(res1.name)+str(res1.num)+str(res1.chain))
+            name_num_list2.append(str(res2.name)+str(res2.num)+str(res2.chain))
             print "output "+str(res1.name)+" "+str(res1.num)
             print res1.name, res1.num
             #print arr2str2(chi_pop_hist1[:,:], precision=3, length=6)
@@ -680,6 +994,22 @@ class KLdiv:
                            
 
             counter1 += 1
+
+        ### Write autocorrelation
+        #timescales_chis = output_timescales_chis(prefix+"_chis_implied_timescales_bootstrap_avg",reslist1,name_num_list)
+        #timescales_chis_boots = output_timescales_chis(prefix+"_chis_implied_timescales_bootstrap_avg",reslist1,name_num_list)
+        #lagtimes_chis = output_lagtimes_chis(prefix+"_chis_lagtimes_bootstrap_avg",reslist1,name_num_list)
+        #lagtimes_chis = output_lagtimes_chis_last(prefix+"_chis_lagtimes_bootstrap_last",reslist1,name_num_list)
+        #timescales_chis = output_timescales_chis_avg(prefix+"_avg_over_chis_implied_timescales_bootstrap_avg",reslist1,name_num_list)
+        #timescales_chis = output_timescales_chis_max(prefix+"_avg_over_chis_implied_timescales_bootstrap_max",reslist1,name_num_list)
+        #timescales_chis = output_timescales_chis_last(prefix+"_avg_over_chis_implied_timescales_bootstrap_last",reslist1,name_num_list)
+        
+
+        timescales_angles_autocorr1 = output_timescales_angles_autocorr_chis(self.run_params1.resfile_fn+"_chis_angles_autocorr_time_bootstrap_avg",reslist1,name_num_list1)
+        timescales_angles_autocorr2 = output_timescales_angles_autocorr_chis(self.run_params2.resfile_fn+"_chis_angles_autocorr_time_bootstrap_avg",reslist2,name_num_list2)
+
+        #this next one is useful for a convergence series
+        #timescales_angles_autocorr_boots = output_timescales_angles_autocorr_chis_boots(prefix+"_chis_angles_autocorr_time_bootstrap_max",reslist1,bootstrap_sets,name_num_list2) #bootstrap_sets are len(run_params.which_runs)
 
         ### Write Pymol Session Files ####
         print "Writing Pymol Session Files"
@@ -717,21 +1047,23 @@ class KLdiv:
         pymolfile_js.write("cmd.disable('b0')"+"\n")
         pymolfile_js.write("cmd.bg_color('white')"+"\n")
 
-        pymolfile_kl_tor.write("from pymol import cmd"+"\n")
-        pymolfile_kl_tor.write("load "+str(kl_tor_pdbfile)+", system \n")
-        pymolfile_kl_tor.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
-        pymolfile_kl_tor.write("sele b0, b < 0.00001"+"\n")
-        pymolfile_kl_tor.write("cmd.color(5278, 'b0')"+"\n")
-        pymolfile_kl_tor.write("cmd.disable('b0')"+"\n")
-        pymolfile_kl_tor.write("cmd.bg_color('white')"+"\n")
+        self.pymolfile_replace_bfac_res_tor(pymolfile_kl_tor, kl_tor_pdbfile )
+        #pymolfile_kl_tor.write("from pymol import cmd"+"\n")
+        #pymolfile_kl_tor.write("load "+str(kl_tor_pdbfile)+", system \n")
+        #pymolfile_kl_tor.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
+        #pymolfile_kl_tor.write("sele b0, b < 0.00001"+"\n")
+        #pymolfile_kl_tor.write("cmd.color(5278, 'b0')"+"\n")
+        #pymolfile_kl_tor.write("cmd.disable('b0')"+"\n")
+        #pymolfile_kl_tor.write("cmd.bg_color('white')"+"\n")
         
-        pymolfile_js_tor.write("from pymol import cmd"+"\n")
-        pymolfile_js_tor.write("load "+str(js_tor_pdbfile)+", system \n")
-        pymolfile_js_tor.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
-        pymolfile_js_tor.write("sele b0, b < 0.00001"+"\n")
-        pymolfile_js_tor.write("cmd.color(5278, 'b0')"+"\n")
-        pymolfile_js_tor.write("cmd.disable('b0')"+"\n")
-        pymolfile_js_tor.write("cmd.bg_color('white')"+"\n")
+        self.pymolfile_replace_bfac_res_tor(pymolfile_js_tor, js_tor_pdbfile )
+        #pymolfile_js_tor.write("from pymol import cmd"+"\n")
+        #pymolfile_js_tor.write("load "+str(js_tor_pdbfile)+", system \n")
+        #pymolfile_js_tor.write("preset.b_factor_putty('system')"+"\n")  #,_self=cmd"+"\n")
+        #pymolfile_js_tor.write("sele b0, b < 0.00001"+"\n")
+        #pymolfile_js_tor.write("cmd.color(5278, 'b0')"+"\n")
+        #pymolfile_js_tor.write("cmd.disable('b0')"+"\n")
+        #pymolfile_js_tor.write("cmd.bg_color('white')"+"\n")
 
         pymolfile_ent1.write("from pymol import cmd"+"\n")
         pymolfile_ent1.write("load "+str(ent1_pdbfile)+", system \n")
@@ -763,16 +1095,17 @@ class KLdiv:
         pymolfile_dS.write("cmd.disable('b0')"+"\n")
         pymolfile_dS.write("cmd.bg_color('white')"+"\n")
 
-        pymolfile_dS_tor.write("run "+str(MutInf_Path)+"/color_b.py \n")
+        self.pymolfile_replace_bfac_res_tor(pymolfile_js_tor, js_tor_pdbfile, delta=True )
+        #pymolfile_dS_tor.write("run "+str(MutInf_Path)+"/color_b.py \n")
         #pymolfile_dS.write("from pymol import cmd"+"\n")
-        pymolfile_dS_tor.write("load "+str(dS_tor_pdbfile)+", system \n")
-        pymolfile_dS_tor.write("preset.pretty('system')"+"\n")  #,_self=cmd"+"\n")
-        pymolfile_dS_tor.write("color_b(selection='b<0',gradient='bw',mode='hist')\n")
-        pymolfile_dS_tor.write("color_b(selection='b>0',gradient='wr',mode='hist')\n")
-        pymolfile_dS_tor.write("sele b0, b < 0.00001 and b > -0.00001 "+"\n")
-        pymolfile_dS_tor.write("cmd.color(5278, 'b0')"+"\n")
-        pymolfile_dS_tor.write("cmd.disable('b0')"+"\n")
-        pymolfile_dS_tor.write("cmd.bg_color('white')"+"\n")
+        #pymolfile_dS_tor.write("load "+str(dS_tor_pdbfile)+", system \n")
+        #pymolfile_dS_tor.write("preset.pretty('system')"+"\n")  #,_self=cmd"+"\n")
+        #pymolfile_dS_tor.write("color_b(selection='b<0',gradient='bw',mode='hist')\n")
+        #pymolfile_dS_tor.write("color_b(selection='b>0',gradient='wr',mode='hist')\n")
+        #pymolfile_dS_tor.write("sele b0, b < 0.00001 and b > -0.00001 "+"\n")
+        #pymolfile_dS_tor.write("cmd.color(5278, 'b0')"+"\n")
+        #pymolfile_dS_tor.write("cmd.disable('b0')"+"\n")
+        #pymolfile_dS_tor.write("cmd.bg_color('white')"+"\n")
 
         pymol_bfactor_column_to_bonds_coloring = """
 
@@ -1011,6 +1344,10 @@ END
         pymolfile_ent2.close()
         pymolfile_dS.close()
 
+
+
+
+
     #########################################################################################################################################
     ### _KL_innerloop_calc_ : For two vectors of pdf's (maximum 6 dimensions), calculates 1st-order KLdiv, JSdiv, Chi-Squared  
     #########################################################################################################################################
@@ -1025,8 +1362,17 @@ END
                 ent2   = zeros((6),float64)
                 ### Histogram entropy, the "Shannon" part
                 for mychi in range(nchi_to_use):
-                   ent1[mychi] = sum((chi_counts1[mychi,:] * 1.0 / self.numangles1) * (log(self.numangles1) - special.psi(chi_counts1[mychi,:] + SMALL) - ((-1) ** (chi_counts1[mychi,:] % 2)) / (chi_counts1[mychi,:] + 1.0)),axis=-1) 
-                   ent2[mychi] = sum((chi_counts2[mychi,:] * 1.0 / self.numangles2) * (log(self.numangles2) - special.psi(chi_counts2[mychi,:] + SMALL) - ((-1) ** (chi_counts2[mychi,:] % 2)) / (chi_counts2[mychi,:] + 1.0)),axis=-1) 
+                   if(NO_GRASSBERGER == False):
+                      ent1[mychi] = sum((chi_counts1[mychi,:] * 1.0 / self.numangles1) * (log(self.numangles1) - special.psi(chi_counts1[mychi,:] + SMALL) - ((-1) ** (chi_counts1[mychi,:] % 2)) / (chi_counts1[mychi,:] + 1.0)),axis=-1) 
+                      ent2[mychi] = sum((chi_counts2[mychi,:] * 1.0 / self.numangles2) * (log(self.numangles2) - special.psi(chi_counts2[mychi,:] + SMALL) - ((-1) ** (chi_counts2[mychi,:] % 2)) / (chi_counts2[mychi,:] + 1.0)),axis=-1) 
+                      
+                   else:
+                      pi = chi_pop_hist1[mychi]
+                      pj = chi_pop_hist2[mychi]
+                      ent1[mychi] = -sum( pi[pi > SMALL] * log(pi[pi > SMALL]))
+                      ent1[mychi] = -sum( pi[pi > SMALL] * log(pi[pi > SMALL]))
+
+                   print "singlet entropies: chi "+str(mychi)+" : "+str(ent1[mychi])+" , "+str(ent2[mychi])
                 ###
                 if(self.run_params1.options.grassberger == "no" and self.run_params1.options.abs == "no"):
                     for mychi in range(nchi_to_use):
@@ -1115,6 +1461,9 @@ END
         if self.run_params2.backbone == "coarse_phipsi":
             nchi2 = 1
         nchi_to_use = min(nchi1, nchi2)                
+        chi_pop_hist1_to_return = zeros((self.bootstrap_sets, 6, self.nbins), float64)
+        chi_pop_hist2_to_return = zeros((self.bootstrap_sets, 6, self.nbins), float64)
+
         if(self.which_runs_ref == None): #this indicates we aren't doing bootstrap resampling of reference during this function call
             for mybootstrap in range(self.bootstrap_sets): #bootstraps of target
                 print "bootstrap: "+str(mybootstrap)
@@ -1126,19 +1475,25 @@ END
                 #REFERENCE DISTRIBUTION
                 chi_counts1 = sum(res1.chi_counts[:,:nchi_to_use,:],axis=0)  #average over bootstrap dimension for reference in this case
                 chi_pop_hist1 = chi_counts1 / (1.0 * resize(sum(chi_counts1, axis = -1),chi_counts1.shape))
-                chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
-                chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
+                chi_pop_hist1_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist1[:nchi_to_use,:]
+                chi_pop_hist2_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist2[:nchi_to_use,:]
+                
+                #chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
+                #chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
                 #RUN CALCULATION, AVOIDING NaNs
                 print "counts i:"+str(int32(chi_counts1))+"\n"
                 print "counts j:"+str(int32(chi_counts2))+"\n"
                 print "pi      :"+str(chi_pop_hist1)+"\n"
                 print "pj      :"+str(chi_pop_hist2)+"\n"
+                
+                
                 (kldiv4, jsdiv4, chisq4, ent1, ent2) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
                 self.kldiv[mybootstrap,:nchi_to_use] = kldiv4[:nchi_to_use]
                 self.jsdiv[mybootstrap,:nchi_to_use] = jsdiv4[:nchi_to_use]
                 self.chisq[mybootstrap,:nchi_to_use] = chisq4[:nchi_to_use]
                 self.ent1[mybootstrap,:nchi_to_use]  = ent1[:nchi_to_use]
                 self.ent2[mybootstrap,:nchi_to_use]  = ent2[:nchi_to_use]
+                
         else:  #usually here, res1 and res2 are from the same residue list, just different "runs" will be used through which_runs_ref and its complement
             print "res1 chi counts shape:"+str(res1.chi_counts.shape)
             minangles = min(sum(res1.chi_counts[0,0]), sum(res2.chi_counts[0,0])) #minimum of number of datapoints in each 
@@ -1195,8 +1550,11 @@ END
                 print "chi_counts2:"+str(int16(chi_counts2))
                 chi_pop_hist1 = chi_counts1 / (1.0 * resize(sum(chi_counts1, axis = -1),chi_counts1.shape)) #normalization
                 chi_pop_hist2 = chi_counts2 / (1.0 * resize(sum(chi_counts2, axis = -1),chi_counts2.shape)) #normalization
-                chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
-                chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
+                chi_pop_hist1_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist1[:nchi_to_use,:]
+                chi_pop_hist2_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist2[:nchi_to_use,:]
+                
+                #chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
+                #chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
                 (kldiv, jsdiv, chisq, ent1, ent2) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
                 self.kldiv[mybootstrap,:nchi_to_use] = kldiv[:nchi_to_use]
                 self.jsdiv[mybootstrap,:nchi_to_use] = jsdiv[:nchi_to_use]
@@ -1206,7 +1564,7 @@ END
 
         print "kldiv:\n"+str(self.kldiv)
         print "KLDIV", res1.name, res1.num, fmt_floats(list((average(self.kldiv,axis=0)).flatten()), digits=6, length=9), "JSDIV", fmt_floats(list((average(self.jsdiv,axis=0)).flatten()), digits=6, length=9)
-        return self.kldiv, self.chisq, self.jsdiv, self.ent1, self.ent2
+        return self.kldiv, self.chisq, self.jsdiv, self.ent1, self.ent2, chi_pop_hist1_to_return, chi_pop_hist2_to_return
 
 
 
@@ -1463,6 +1821,8 @@ END
         self.jsdiv = zeros((self.bootstrap_sets, 6), float64) # Jensen-Shannon Divergence (JSdiv) for one residue: max torsions per res=6
         self.ent1 = zeros((self.bootstrap_sets, 6), float64) # histogram entropy for one referece residue: max torsions per res=6
         self.ent2 = zeros((self.bootstrap_sets, 6), float64) # histogram entropy for one target   residue: max torsions per res=6
+        self.chi_pop_hist1_res = zeros((len(self.reslist1),self.bootstrap_sets, 6, self.nbins), float64) # dihedral histogram for all residues for reference
+        self.chi_pop_hist2_res = zeros((len(self.reslist1),self.bootstrap_sets, 6, self.nbins), float64) # dihedral histogram for all residues for target
         self.kldiv_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # KLdiv for all residues
         self.chisq_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # Chi-Squared for all residues
         self.jsdiv_res = zeros((len(self.reslist1),self.bootstrap_sets, 6), float64) # JSdiv for all residues
@@ -1476,7 +1836,7 @@ END
         for res1, res2 in zip(self.reslist1, self.reslist2):
             #consider refactoring this into a more functional form
             #calculate KLdiv between these two residues... this routine may later include higher-order terms and coord. transforms.
-            (self.kldiv_res[counter,:,:],  self.chisq_res[counter,:,:], self.jsdiv_res[counter,:,:], self.ent1_res[counter,:,:], self.ent2_res[counter,:,:]) = self.__KL_resi_resj__(res1,res2)
+            (self.kldiv_res[counter,:,:],  self.chisq_res[counter,:,:], self.jsdiv_res[counter,:,:], self.ent1_res[counter,:,:], self.ent2_res[counter,:,:], self.chi_pop_hist1_res[counter,:,:,:], self.chi_pop_hist2_res[counter,:,:,:] ) = self.__KL_resi_resj__(res1,res2)
 	    newreslist1.append(Residue_Lite(res1.name,res1.num,res1.chain)) 
 	    newreslist2.append(Residue_Lite(res2.name,res2.num,res2.chain))
 	    counter += 1
@@ -1490,6 +1850,216 @@ END
         self.kldiv_done = 1 # flag
         
         # Will use this later in output
+
+
+#########################################################################################################################################
+### _Second_Order_KLdiv_innerloop_calc_ : For second-order kldiv involving these two distributions and another two
+#########################################################################################################################################
+
+def _Second_Order_KLdiv_innerloop_calc_(self,other_div, resi, resj):
+   
+   bins1      = self.reslist1[resi].bins
+   bins1_star = self.reslist2[resi].bins
+   bins2      = other_div.reslist1[resi].bins
+   bins2      = other_div.reslist2[resi].bins
+   bootstrap_sets =self.bootstrap_sets
+   res1=self.reslist1[resi]
+   res2=self.reslist2[resi]
+   if count_matrix == None:    
+
+       count_matrix = zeros((bootstrap_sets, permutations + 1 , nbins*nbins), float64)
+       count_matrix_star = zeros((bootstrap_sets, permutations + 1 , nbins*nbins), float64)
+   #if(self.run_params1.phipsi >= 0):
+   #   nchi1 = res1.get_num_chis(res1.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
+   #   nchi2 = res2.get_num_chis(res2.name)* (1 - self.backbone_only) + self.run_params1.phipsi 
+   #elif(self.run_params1.phipsi == -4):
+   #   print "doing analysis of stress data"
+   #   nchi1 = 1 # just phi as a placeholder for a single variable
+   #   nchi2 = 1 # just phi as a placeholder for a single variable
+   #   if self.run_params1.backbone == "coarse_phipsi":
+   #      nchi1 = 1
+   #   if self.run_params2.backbone == "coarse_phipsi":
+   #      nchi2 = 1
+   #nchi_to_use = min(nchi1, nchi2)                
+   
+   code = """
+    // weave6
+    // bins dimensions: (permutations + 1) * bootstrap_sets * bootstrap_choose * max_num_angles
+     //#include <math.h>
+     double weight;
+     int angle1_bin;
+     int angle2_bin;
+     int bin1;
+     int bin2;
+     int mybootstrap, permut;
+     long anglenum, mynumangles, counts1, counts2, counts12 ; 
+     double mysign1, mysign2, mysign12, counts1d, counts2d, counts12d, dig1, dig2, dig12;
+     
+     #pragma omp parallel for private(mybootstrap,mynumangles,permut,anglenum,angle1_bin,angle2_bin,weight,bin1, bin2, mysign1, mysign2, mysign12, counts1, counts1d, counts2, counts2d, counts12, counts12d, dig1, dig2, dig12 )
+     for( mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
+      mynumangles = 0;
+      mynumangles = *(numangles_bootstrap + mybootstrap);
+      for (permut=0; permut < permutations + 1; permut++) {          
+          for (anglenum=offset; anglenum< mynumangles; anglenum++) {
+          //if(mybootstrap == bootstrap_sets - 1) {
+          //  //printf("bin12 %i \\n",(*(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum))*nbins +   (*(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum)));
+          //  }
+           if(anglenum == mynumangles - 1) {
+             printf(""); //just to make sure count matrix values are written to disk before the next loop
+           }
+           //if(anglenum % markov_interval[mybootstrap] == 0) { 
+              angle1_bin = *(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum);
+              angle2_bin = *(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum - offset);
+              weight = *(boot_weights + mybootstrap*bootstrap_choose*max_num_angles + anglenum); //assumes mynumangles same for all dihedrals, for nonzero offsets assumes equal weights
+              *(count_matrix  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  angle1_bin*nbins +   angle2_bin ) += 1.0 * weight * weight;
+           //} 
+          }
+         }
+      }
+     
+    """
+
+   code_star = """
+    // weave6
+    // bins dimensions: (permutations + 1) * bootstrap_sets * bootstrap_choose * max_num_angles
+     //#include <math.h>
+     double weight;
+     int angle1_bin;
+     int angle2_bin;
+     int bin1;
+     int bin2;
+     int mybootstrap, permut;
+     long anglenum, mynumangles, counts1, counts2, counts12 ; 
+     double mysign1, mysign2, mysign12, counts1d, counts2d, counts12d, dig1, dig2, dig12;
+     
+     #pragma omp parallel for private(mybootstrap,mynumangles,permut,anglenum,angle1_bin,angle2_bin,weight,bin1, bin2, mysign1, mysign2, mysign12, counts1, counts1d, counts2, counts2d, counts12, counts12d, dig1, dig2, dig12 )
+     for( mybootstrap=0; mybootstrap < bootstrap_sets; mybootstrap++) {
+      mynumangles = 0;
+      mynumangles = *(numangles_bootstrap + mybootstrap);
+      for (permut=0; permut < permutations + 1; permut++) {          
+          for (anglenum=offset; anglenum< mynumangles; anglenum++) {
+          //if(mybootstrap == bootstrap_sets - 1) {
+          //  //printf("bin12 %i \\n",(*(bins1  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum))*nbins +   (*(bins2 + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum)));
+          //  }
+           if(anglenum == mynumangles - 1) {
+             printf(""); //just to make sure count matrix values are written to disk before the next loop
+           }
+           //if(anglenum % markov_interval[mybootstrap] == 0) { 
+              angle1_bin = *(bins1_star  +  mybootstrap*bootstrap_choose*max_num_angles  +  anglenum);
+              angle2_bin = *(bins2_star + permut*bootstrap_sets*bootstrap_choose*max_num_angles + mybootstrap*bootstrap_choose*max_num_angles  +  anglenum - offset);
+              weight = *(boot_weights + mybootstrap*bootstrap_choose*max_num_angles + anglenum); //assumes mynumangles same for all dihedrals, for nonzero offsets assumes equal weights
+              *(count_matrix_star  +  mybootstrap*(permutations + 1)*nbins*nbins  +  permut*nbins*nbins  +  angle1_bin*nbins +   angle2_bin ) += 1.0 * weight * weight;
+           //} 
+          }
+         }
+      }
+     
+   """
+
+         
+   weave.inline(code, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1', 'bins2', 'count_matrix','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
+                 'SMALL'],
+                 compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
+                 support_code=my_support_code)
+
+   weave.inline(code_star, ['num_sims', 'numangles_bootstrap', 'nbins', 'bins1_star', 'bins2_star', 'count_matrix_star','bootstrap_sets','permutations','max_num_angles','bootstrap_choose','boot_weights','offset', 
+                 'SMALL'],
+                 compiler = mycompiler,runtime_library_dirs=["/usr/lib64/"], library_dirs=["/usr/lib64/"], libraries=["stdc++"],  extra_compile_args =my_extra_compile_args[mycompiler],extra_link_args=my_extra_link_args[mycompiler],
+                 support_code=my_support_code)
+         
+
+   ### WILL NEED TO MODIFY THESE PARTS BELOW TO DO BOOTSTRAPS APPROPRIATELY AND USE TWO-D COUNTS MATRICES 
+
+        #nchi1, nchi2 = res1.chi_pop_hist.shape[1], res2.chi_pop_hist.shape[1]
+
+      
+
+
+        if(self.which_runs_ref == None): #this indicates we aren't doing bootstrap resampling of reference during this function call
+            for mybootstrap in range(self.bootstrap_sets): #bootstraps of target
+                print "bootstrap: "+str(mybootstrap)
+                #print res1.pop_hist, res1.chi_counts # bootstraps, nchi, nbins
+                # reference now always has bootstrap_sets = 1
+                ## TARGET DISTRIBUTION
+                chi_counts2 = res2.chi_counts[mybootstrap,:nchi_to_use,:]  #grab data from a bootstrap sample of the target data
+                chi_pop_hist2 =  chi_counts2 / (1.0 * resize(sum(chi_counts2, axis = -1), chi_counts2.shape))
+                #REFERENCE DISTRIBUTION
+                chi_counts1 = sum(res1.chi_counts[:,:nchi_to_use,:],axis=0)  #average over bootstrap dimension for reference in this case
+                chi_pop_hist1 = chi_counts1 / (1.0 * resize(sum(chi_counts1, axis = -1),chi_counts1.shape))
+                chi_pop_hist1_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist1[:nchi_to_use,:]
+                chi_pop_hist2_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist2[:nchi_to_use,:]
+                
+                #chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
+                #chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
+                #RUN CALCULATION, AVOIDING NaNs
+                print "counts i:"+str(int32(chi_counts1))+"\n"
+                print "counts j:"+str(int32(chi_counts2))+"\n"
+                print "pi      :"+str(chi_pop_hist1)+"\n"
+                print "pj      :"+str(chi_pop_hist2)+"\n"
+                
+                
+                (kldiv4, jsdiv4, chisq4, ent1, ent2) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
+                self.kldiv[mybootstrap,:nchi_to_use] = kldiv4[:nchi_to_use]
+                self.jsdiv[mybootstrap,:nchi_to_use] = jsdiv4[:nchi_to_use]
+                self.chisq[mybootstrap,:nchi_to_use] = chisq4[:nchi_to_use]
+                self.ent1[mybootstrap,:nchi_to_use]  = ent1[:nchi_to_use]
+                self.ent2[mybootstrap,:nchi_to_use]  = ent2[:nchi_to_use]
+                
+        else:  #usually here, res1 and res2 are from the same residue list, just different "runs" will be used through which_runs_ref and its complement
+            print "res1 chi counts shape:"+str(res1.chi_counts.shape)
+            minangles = min(sum(res1.chi_counts[0,0]), sum(res2.chi_counts[0,0])) #minimum of number of datapoints in each 
+            subsample_block_size = int(minangles / (self.run_params1.blocks_ref * 1.0))
+            subsample_choose_ref = int(self.run_params1.blocks_ref / 2.0) #subsample_choose_ref should be half of blocks_ref
+            #bootstrap_sets =  int(misc.comb(self.run_params1.blocks_ref,subsample_choose_ref)) #like bootstrap_sets, just for the reference, so it gets a 
+            print "bootstrap sets reference: "+str(self.bootstrap_sets)
+            #bootstrap_sets = self.bootstrap_sets
+            which_runs_ref = []
+            
+            #NOTE THIS NEW WAY OF DOING BOOTSTRAPS IS PURE PYTHON AND MEMORY EFFICIENT
+            for mybootstrap in range(self.bootstrap_sets): 
+                kldiv1 = zeros((6),float64)
+                kldiv2 = zeros((6),float64)
+                jsdiv2 = zeros((6),float64)
+                kldiv4 = zeros((6),float64)
+                jsdiv4 = zeros((6),float64)
+                chi_counts1 = zeros((nchi_to_use,self.nbins),float64)
+                chi_counts2 = zeros((nchi_to_use,self.nbins),float64)
+                print "chi counts 1: "
+                print chi_counts1
+                print "chi counts 2: "
+                print chi_counts2
+                for myblock in range(self.subsample_choose_ref):
+                    #we're only selecting the histogram of bin number = nbins, which is first variable entry "1"; a more optimal bin size could be chosen by computing kldiv from multiple
+                    #print "which runs ref:"+str(self.which_runs_ref[mybootstrap,myblock])
+                    #print "which runs ref comp:"+str(self.which_runs_ref_complement[mybootstrap,myblock])
+
+                    ## Will need to get use count_matrix from within here to get two-dimensional chi counts
+
+                    chi_counts1 += res1.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref[mybootstrap,myblock],:nchi_to_use,:self.nbins]
+                    chi_counts2 += res2.chi_counts_sequential_varying_bin_size[1,self.which_runs_ref_complement[mybootstrap,myblock],:nchi_to_use,:self.nbins]
+                    
+                    
+                
+                print "chi_counts1:"+str(int16(chi_counts1))
+                print "chi_counts2:"+str(int16(chi_counts2))
+                chi_pop_hist1 = chi_counts1 / (1.0 * resize(sum(chi_counts1, axis = -1),chi_counts1.shape)) #normalization
+                chi_pop_hist2 = chi_counts2 / (1.0 * resize(sum(chi_counts2, axis = -1),chi_counts2.shape)) #normalization
+                chi_pop_hist1_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist1[:nchi_to_use,:]
+                chi_pop_hist2_to_return[mybootstrap,:nchi_to_use,:] = chi_pop_hist2[:nchi_to_use,:]
+                
+                #chi_pop_hist1[chi_pop_hist1==0] = SMALL * 0.5 # to avoid NaNs
+                #chi_pop_hist2[chi_pop_hist2==0] = SMALL * 0.5 # to avoid NaNs
+                (kldiv, jsdiv, chisq, ent1, ent2) = self._KL_innerloop_calc_(chi_pop_hist1, chi_pop_hist2, chi_counts1, chi_counts2, nchi_to_use)
+                self.kldiv[mybootstrap,:nchi_to_use] = kldiv[:nchi_to_use]
+                self.jsdiv[mybootstrap,:nchi_to_use] = jsdiv[:nchi_to_use]
+                self.chisq[mybootstrap,:nchi_to_use] = chisq[:nchi_to_use]
+                self.ent1[mybootstrap,:nchi_to_use] = ent1[:nchi_to_use]
+                self.ent2[mybootstrap,:nchi_to_use] = ent2[:nchi_to_use]
+
+        print "kldiv:\n"+str(self.kldiv)
+        print "KLDIV", res1.name, res1.num, fmt_floats(list((average(self.kldiv,axis=0)).flatten()), digits=6, length=9), "JSDIV", fmt_floats(list((average(self.jsdiv,axis=0)).flatten()), digits=6, length=9)
+        return self.kldiv, self.chisq, self.jsdiv, self.ent1, self.ent2, chi_pop_hist1_to_return, chi_pop_hist2_to_return
+
 
 #######################################################################################################################################
 ###
@@ -1595,7 +2165,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params1 = RunParameters(resfile_fn=resfile_fn1, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs1,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array, skip=options.skip,
-                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points )
+                                bootstrap_choose=options.num_sims, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options, bootstrap_set_size=options.num_sims, pdbfile=options.pdbfile, xtcfile=options.xtcfile, blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries=options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points, cyclic_permut=False )
        
     ### SET REFERENCE = 1 
     options.reference = 1 #as this is the one with only one bootstrap, bootstrap_choose=num_sims
@@ -1604,7 +2174,7 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params2 = RunParameters(resfile_fn=resfile_fn2, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs2,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir2, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array2, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points)  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence=options.mutual_divergence, output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points, cyclic_permut=False )  
     #but also use the subsets of the full reference ensemble to look at the variance of the local KL-divergence
 
     resfile_fn3 = resfile_fn1 #as reference is first one
@@ -1616,14 +2186,14 @@ def run_kldiv(options, xvg_basedir1, xvg_basedir2, resfile_fn1, resfile_fn2):
     run_params3 =  RunParameters(resfile_fn=resfile_fn3, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs3,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array3, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points   )  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries = options.output_timeseries, backbone = options.backbone, last_step=options.last_step, lagtime=None, lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples, num_convergence_points=options.num_convergence_points, cyclic_permut=False    )  
 
 
     pair_runs_array4 = pair_runs_array2
     run_params4 =  RunParameters(resfile_fn=resfile_fn4, phipsi=phipsi, backbone_only=backbone_only, nbins = nbins, permutations=0, adaptive_partitioning=adaptive_partitioning,
                                 num_sims=num_sims, num_structs=num_structs, binwidth=options.binwidth, bins=bins, sigalpha=options.sigalpha, which_runs=which_runs4,
                                 xvgorpdb=xvgorpdb, xvg_basedir=xvg_basedir1, calc_variance=False, xvg_chidir=options.xvg_chidir, pair_runs=pair_runs_array4, skip=options.skip,
-                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no", last_step=options.last_step, lagtime=None,  lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples , num_convergence_points=options.num_convergence_points )  
+                                bootstrap_choose=options.bootstrap_set_size, calc_mutinf_between_sims=False, load_matrices_numstructs=0, skip_over_steps=options.zoom_to_step, max_num_chis=options.max_num_chis, options=options,bootstrap_set_size=options.bootstrap_set_size, pdbfile=options.pdbfile, xtcfile=options.xtcfile2,  blocks_ref = blocks_ref, mutual_divergence="no", output_timeseries="no", last_step=options.last_step, lagtime=None,  lagtime_interval=options.lagtime_interval, markov_samples=options.markov_samples , num_convergence_points=options.num_convergence_points, cyclic_permut=False  )  
     
     
     ## LOAD DATA, GET A LIST OF CLASS ResidueChis ##
